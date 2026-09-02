@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+
+{% block title %}Portal · {{ workshop.title }}{% endblock %}
+
+{% block content %}
+<section class="auth-card" aria-labelledby="portal-title">
+  <p class="eyebrow">Authenticated portal</p>
+  <h1 id="portal-title">Welcome, {{ current_user.username }}</h1>
+  <p>Your {{ current_user.role }} account is signed in. Workshop activity will appear here in a later increment.</p>
+</section>
+{% endblock %}

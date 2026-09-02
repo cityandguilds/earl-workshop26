@@ -21,7 +21,7 @@ The installed console entry point is also available:
 uv run earl-workshop serve
 ```
 
-The portal foundation has no authentication or persistent attendee state yet. Those capabilities are intentionally reserved for later implementation slices.
+The portal now includes application-managed user persistence and portal authentication. VM credentials, attendee/VM assignment, and progress state are intentionally reserved for later implementation slices.
 
 ## Repository layout
 
@@ -31,7 +31,7 @@ content/workshop.yml    workshop title and subtitle
 content/pages/          Markdown course pages
 resources/              non-secret teaching resources
 src/earl_workshop/      FastAPI app, loader, templates, and CSS
-tests/                  content and application foundation tests
+tests/                  content, persistence, and authentication tests
 ```
 
 The supplied files under `assets/` are the branding authority. `assets/brand.md` currently approves `#E31837` as the primary colour and `#1D252D` as the secondary colour; the CSS uses those values and a system sans-serif fallback. The supplied `assets/cg-lion-news-cover-lion-jpg.jpg` is the visual source for the canonical local `assets/logo.svg` and `assets/favicon.png` files. The logo URL is served as SVG and the favicon URL as PNG; no external fonts, logos, CDN, or JavaScript framework is required.
@@ -80,9 +80,25 @@ EARL_WORKSHOP_DATA_DIR
 EARL_WORKSHOP_PUBLIC_BASE_URL
 EARL_WORKSHOP_ENVIRONMENT
 EARL_WORKSHOP_SECURE_COOKIES
+EARL_WORKSHOP_SESSION_SECRET
+EARL_WORKSHOP_DATABASE_PATH
 ```
 
-Session and VM-encryption key settings are represented for subsequent slices but are not required by this read-only foundation. Runtime data defaults to `.data/` in a source checkout and is ignored by Git.
+Runtime data defaults to `.data/` in a source checkout and is ignored by Git. The SQLite database defaults to `.data/earl_workshop.sqlite3`; set `EARL_WORKSHOP_DATA_DIR` to place the whole runtime directory elsewhere, or set `EARL_WORKSHOP_DATABASE_PATH` for an explicit SQLite path. Both locations must be writable and should be outside installed package files. The application creates the directory and current schema automatically on startup; initialization is safe to rerun against an existing database.
+
+Set `EARL_WORKSHOP_SESSION_SECRET` to a long random value for any deployed application. Production refuses to start without it. In development and tests, an unconfigured process gets a random in-process secret so it cannot silently use a predictable shared signing key; sessions from that process do not survive a restart. Set `EARL_WORKSHOP_SECURE_COOKIES=true` when serving through HTTPS. Session cookies are HttpOnly, signed, and SameSite=Lax.
+
+## Accounts and authentication
+
+Create the first administrator from an interactive terminal. The password is prompted securely and is never a command-line argument:
+
+```bash
+EARL_WORKSHOP_DATA_DIR=.data uv run earl-workshop create-admin
+```
+
+The command prompts for a username, password, and confirmation. Portal roles are `admin` and `attendee`; administrator-only server routes return an authorization failure to attendees and anonymous requests. Login errors intentionally use one generic message, and inactive accounts cannot establish a session. Login and logout forms carry a token bound to the signed session; missing or invalid CSRF tokens are rejected.
+
+Portal account passwords are stored only as one-way Argon2 password hashes. They are not logged or returned by the application. These portal passwords are distinct from any future VM credentials, which are outside this slice and are not stored in the user model.
 
 Build an installable wheel with:
 
@@ -94,4 +110,4 @@ The wheel includes the package templates/CSS plus the current placeholder conten
 
 ## Deferred infrastructure
 
-This foundation intentionally does not implement authentication, SQLite attendee state, VM credentials or assignments, progress tracking, administrator screens, resource download routes, DigitalOcean/Terraform provisioning, monitoring, production bootstrap automation, final curriculum, domain/TLS automation, or conference deployment. It also does not require Node.js.
+This increment intentionally does not implement VM credentials or assignments, progress tracking, administrator account-management UI, resource download routes, DigitalOcean/Terraform provisioning, monitoring, production bootstrap automation, final curriculum, domain/TLS automation, or conference deployment. It also does not require Node.js.

@@ -34,6 +34,14 @@ a { color: inherit; }
 
 .header-kicker { color: #D9DDDF; font-size: 0.82rem; letter-spacing: 0.04em; }
 
+.header-account { display: flex; align-items: center; gap: 0.75rem; }
+
+.header-account form { margin: 0; }
+
+.header-user { color: #D9DDDF; font-size: 0.85rem; }
+
+.link-button { border: 0; cursor: pointer; font: inherit; }
+
 .hero { display: grid; grid-template-columns: minmax(0, 1fr) 15rem; align-items: center; gap: 4rem; padding: 5.5rem 0 4.5rem; }
 
 .hero-copy { max-width: 46rem; }
@@ -111,6 +119,20 @@ code { padding: 0.1rem 0.3rem; color: var(--ink); background: #E9ECEC; border-ra
 .markdown-body blockquote { margin-left: 0; padding-left: 1.2rem; color: var(--muted); border-left: 0.25rem solid var(--red); }
 
 .page-navigation { display: flex; justify-content: space-between; gap: 1rem; padding: 1.5rem 0 4rem; border-top: 1px solid var(--line); }
+
+.auth-card { max-width: 34rem; margin: 4rem auto 6rem; padding: 2rem; background: var(--white); border: 1px solid var(--line); }
+
+.auth-card h1 { font-size: clamp(2.3rem, 5vw, 4rem); }
+
+.auth-form { display: grid; gap: 0.6rem; margin-top: 1.5rem; }
+
+.auth-form label { margin-top: 0.45rem; font-weight: 700; }
+
+.auth-form input:not([type="hidden"]) { width: 100%; padding: 0.7rem; border: 1px solid var(--line); font: inherit; }
+
+.auth-form button { justify-self: start; margin-top: 0.8rem; border: 0; cursor: pointer; font: inherit; }
+
+.form-error { padding: 0.75rem 1rem; color: #8E1025; background: #F1E5E7; border-left: 0.25rem solid var(--red); }
 
 .button { display: inline-block; padding: 0.65rem 1rem; color: var(--white); background: var(--red); text-decoration: none; font-weight: 700; }
 

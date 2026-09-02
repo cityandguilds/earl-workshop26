@@ -1,4 +1,4 @@
-"""Environment-driven settings for the read-only application foundation."""
+"""Environment-driven settings for the workshop portal."""
 
 from __future__ import annotations
 
@@ -32,8 +32,8 @@ class Settings:
     """Runtime settings, with source-checkout and wheel-friendly defaults.
 
     Content and resources can be moved outside the installed package by setting their
-    corresponding environment variables. Secrets are represented here for the later
-    stateful slices but are intentionally not required by this read-only slice.
+    corresponding environment variables. Runtime state is kept in ``data_dir`` rather
+    than in installed package files.
     """
 
     root_dir: Path
@@ -48,6 +48,13 @@ class Settings:
     secure_cookies: bool = False
     session_secret: str | None = None
     vm_encryption_key: str | None = None
+    database_path: Path | None = None
+
+    @property
+    def resolved_database_path(self) -> Path:
+        """Return the configured SQLite file, defaulting to the runtime data directory."""
+
+        return self.database_path or self.data_dir / "earl_workshop.sqlite3"
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -74,6 +81,13 @@ class Settings:
             raise ValueError(f"EARL_WORKSHOP_PORT must be between 1 and 65535, got {port}")
 
         public_base_url = os.getenv("EARL_WORKSHOP_PUBLIC_BASE_URL", "").rstrip("/")
+        environment = os.getenv("EARL_WORKSHOP_ENVIRONMENT", "development")
+        session_secret = os.getenv("EARL_WORKSHOP_SESSION_SECRET")
+        if environment.strip().lower() in {"production", "prod"} and not session_secret:
+            raise ValueError(
+                "EARL_WORKSHOP_SESSION_SECRET is required when EARL_WORKSHOP_ENVIRONMENT "
+                "is production"
+            )
         return cls(
             root_dir=root_dir,
             content_dir=_env_path("EARL_WORKSHOP_CONTENT_DIR", content_default),
@@ -83,8 +97,13 @@ class Settings:
             host=os.getenv("EARL_WORKSHOP_HOST", "127.0.0.1"),
             port=port,
             public_base_url=public_base_url,
-            environment=os.getenv("EARL_WORKSHOP_ENVIRONMENT", "development"),
+            environment=environment,
             secure_cookies=_env_bool("EARL_WORKSHOP_SECURE_COOKIES", False),
-            session_secret=os.getenv("EARL_WORKSHOP_SESSION_SECRET"),
+            session_secret=session_secret,
             vm_encryption_key=os.getenv("EARL_WORKSHOP_VM_ENCRYPTION_KEY"),
+            database_path=(
+                Path(os.getenv("EARL_WORKSHOP_DATABASE_PATH")).expanduser()
+                if os.getenv("EARL_WORKSHOP_DATABASE_PATH")
+                else None
+            ),
         )

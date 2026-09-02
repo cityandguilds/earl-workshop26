@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+
+{% block title %}Admin · {{ workshop.title }}{% endblock %}
+
+{% block content %}
+<section class="auth-card" aria-labelledby="admin-title">
+  <p class="eyebrow">Administrator area</p>
+  <h1 id="admin-title">Portal administration</h1>
+  <p>Signed in as {{ current_user.username }}. Account management and VM workflows are reserved for later increments.</p>
+</section>
+{% endblock %}

@@ -18,6 +18,17 @@
           <span class="brand-name">EARL <span>2026</span></span>
         </a>
         <span class="header-kicker">Development to Deployment</span>
+        <div class="header-account">
+          {% if current_user %}
+          <span class="header-user">{{ current_user.username }}</span>
+          <form method="post" action="/logout">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button class="button link-button" type="submit">Sign out</button>
+          </form>
+          {% else %}
+          <a class="button secondary" href="/login">Sign in</a>
+          {% endif %}
+        </div>
       </div>
     </header>
     <main class="shell">

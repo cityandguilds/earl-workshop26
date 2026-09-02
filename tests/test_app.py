@@ -20,8 +20,16 @@ def test_settings_read_runtime_values_from_environment(monkeypatch) -> None:
     assert settings.secure_cookies is True
 
 
-def test_health_and_branded_landing_page() -> None:
-    client = TestClient(create_app())
+def test_health_and_branded_landing_page(tmp_path: Path) -> None:
+    settings = Settings(
+        root_dir=Path("."),
+        content_dir=Path("content"),
+        resources_dir=Path("resources"),
+        asset_dir=Path("assets"),
+        data_dir=tmp_path / "runtime-data",
+        session_secret="test-session-secret-which-is-long-enough",
+    )
+    client = TestClient(create_app(settings))
 
     health = client.get("/healthz")
     landing = client.get("/")
@@ -48,8 +56,16 @@ def test_health_and_branded_landing_page() -> None:
     assert favicon.content.startswith(b"\x89PNG\r\n\x1a\n")
 
 
-def test_course_page_is_rendered_from_loaded_content() -> None:
-    client = TestClient(create_app())
+def test_course_page_is_rendered_from_loaded_content(tmp_path: Path) -> None:
+    settings = Settings(
+        root_dir=Path("."),
+        content_dir=Path("content"),
+        resources_dir=Path("resources"),
+        asset_dir=Path("assets"),
+        data_dir=tmp_path / "runtime-data",
+        session_secret="test-session-secret-which-is-long-enough",
+    )
+    client = TestClient(create_app(settings))
 
     response = client.get("/course/runtime")
 
