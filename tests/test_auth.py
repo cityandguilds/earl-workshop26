@@ -89,7 +89,8 @@ def test_managed_initialization_upgrades_a_previously_created_user_table(tmp_pat
 
     initialize_database(engine)
 
-    assert "session_version" in {column["name"] for column in inspect(engine).get_columns("users")}
+    columns = {column["name"] for column in inspect(engine).get_columns("users")}
+    assert {"session_version", "display_name"} <= columns
 
 
 def test_passwords_are_argon2_hashes_and_no_plaintext_column_exists(tmp_path: Path) -> None:

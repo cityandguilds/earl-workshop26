@@ -50,19 +50,26 @@ def create_user(
     password: str,
     role: UserRole | str = UserRole.ATTENDEE,
     is_active: bool = True,
+    display_name: str | None = None,
 ) -> User:
     """Persist a user with only a one-way password hash."""
 
     normalized_username = normalize_username(username)
     if not normalized_username:
         raise ValueError("Username cannot be empty")
+    if len(normalized_username) > 150:
+        raise ValueError("Username cannot be longer than 150 characters")
     if not password:
         raise ValueError("Password cannot be empty")
     role_value = role.value if isinstance(role, UserRole) else role
     if role_value not in {member.value for member in UserRole}:
         raise ValueError("Role must be admin or attendee")
+    normalized_display_name = display_name.strip() if display_name else None
+    if normalized_display_name and len(normalized_display_name) > 150:
+        raise ValueError("Display name cannot be longer than 150 characters")
     user = User(
         username=normalized_username,
+        display_name=normalized_display_name,
         password_hash=hash_password(password),
         role=role_value,
         is_active=is_active,

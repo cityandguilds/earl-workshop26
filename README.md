@@ -22,8 +22,8 @@ uv run earl-workshop serve
 ```
 
 The portal includes application-managed user persistence, portal authentication, an authenticated
-Markdown course experience, and an attendee VM-credentials dashboard. VM passwords are encrypted
-at rest with a dedicated Fernet key; administrator assignment forms are intentionally deferred.
+Markdown course experience, a protected administrator area, and an attendee VM-credentials
+dashboard. VM passwords are encrypted at rest with a dedicated Fernet key.
 
 ## Repository layout
 
@@ -33,7 +33,7 @@ content/workshop.yml    workshop title and subtitle
 content/pages/          Markdown course pages
 resources/              non-secret teaching resources
 src/earl_workshop/      FastAPI app, loader, templates, and CSS
-tests/                  content, persistence, and authentication tests
+tests/                  content, persistence, authentication, and admin workflow tests
 ```
 
 The supplied files under `assets/` are the branding authority. `assets/brand.md` currently approves `#E31837` as the primary colour and `#1D252D` as the secondary colour; the CSS uses those values and a system sans-serif fallback. The supplied `assets/cg-lion-news-cover-lion-jpg.jpg` is the visual source for the canonical local `assets/logo.svg` and `assets/favicon.png` files. The logo URL is served as SVG and the favicon URL as PNG; no external fonts, logos, CDN, or JavaScript framework is required.
@@ -157,6 +157,30 @@ The command prompts for a username, password, and confirmation. Portal roles are
 
 Portal account passwords are stored only as one-way Argon2 password hashes. They are not logged or returned by the application. VM passwords are a different credential type: they must be recoverable for the assigned attendee, so they are encrypted with `EARL_WORKSHOP_VM_ENCRYPTION_KEY` before being stored in the `vm_credentials.encrypted_password` field and decrypted only for that attendee's dashboard. The `vm_credentials` model stores the host and SSH username alongside that ciphertext; `vm_assignments` links a credential to an attendee and tracks whether it is active, with database uniqueness allowing at most one active VM per attendee and one active attendee per VM. Assignment lookup uses the authenticated session identity and never accepts an attendee-supplied record ID. An attendee without an active assignment sees a waiting state.
 
+## Administrator operations
+
+After creating the first administrator, sign in and open `/admin`. Every administrator page and
+mutation checks the signed-in `admin` role on the server and every form carries the session-bound
+CSRF token. The area provides:
+
+- attendee creation with a normalized unique username, optional display name, and an initial
+  password;
+- password replacement, display-name updates, and activation/deactivation for attendee accounts;
+- VM credential creation and editing for host/IP, SSH username, and an optional encrypted password
+  replacement;
+- assignment, reassignment, and unassignment of existing VM records; moving a VM also clears any
+  previous assignment held by the selected attendee so ownership is unambiguous;
+- one overview of all attendee accounts, active state, VM host, and current-course progress.
+
+There is no application-level attendee capacity limit. Passwords are never echoed in validation
+messages or general administrator lists. A blank VM replacement-password field keeps the existing
+encrypted password. Portal password resets invalidate the attendee's existing sessions.
+
+Progress is calculated against the Markdown pages loaded from the current `content/` directory:
+the overview's completed count, total, and last-progress timestamp do not use a hard-coded page
+total. VMs are entered manually in v0.1.0; cloud provisioning and related infrastructure
+automation are deferred.
+
 Build an installable wheel with:
 
 ```bash
@@ -167,7 +191,8 @@ The wheel includes the package templates/CSS plus the current placeholder conten
 
 ## Deferred infrastructure
 
-This v0.1.0 increment intentionally does not implement administrator forms for creating or assigning
-VM records, VM provisioning, SSH connectivity checks, VM health monitoring, DigitalOcean/Terraform
-provisioning, production bootstrap automation, final curriculum, domain/TLS automation, or
-conference deployment. VM provisioning is not part of v0.1.0. It also does not require Node.js.
+This v0.1.0 increment does not include VM provisioning, SSH connectivity checks, VM health
+monitoring, DigitalOcean/Terraform provisioning, production bootstrap automation, final
+curriculum, domain/TLS automation, or conference deployment. VM provisioning is not part of
+v0.1.0: administrators enter VM records manually through `/admin`. It also does not require
+Node.js.

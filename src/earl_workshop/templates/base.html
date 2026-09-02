@@ -21,6 +21,7 @@
         <div class="header-account">
           {% if current_user %}
           <a class="header-link" href="/course">Course</a>
+          {% if current_user.role == 'admin' %}<a class="header-link" href="/admin">Admin</a>{% endif %}
           <span class="header-user">{{ current_user.username }}</span>
           <form method="post" action="/logout">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">

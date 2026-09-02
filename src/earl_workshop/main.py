@@ -14,15 +14,19 @@ from fastapi import Depends, FastAPI, Form, HTTPException, Query, Request, statu
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from sqlalchemy.orm import Session
+from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session, joinedload
 from starlette.middleware.sessions import SessionMiddleware
 
 from . import __version__
 from .auth import (
     authenticate_user,
+    create_user,
     csrf_token,
     current_user,
     establish_session,
+    hash_password,
     invalidate_session,
     require_authenticated_user,
     require_role,
@@ -30,10 +34,20 @@ from .auth import (
 )
 from .config import Settings
 from .course import CoursePage, Workshop, load_workshop
-from .credentials import VMEncryptionError, attendee_connection, validate_vm_encryption_key
+from .credentials import (
+    VMEncryptionError,
+    attendee_connection,
+    create_vm_credential,
+    reassign_vm_credential,
+    update_vm_credential,
+    validate_vm_encryption_key,
+)
 from .db import (
+    CourseProgress,
     User,
     UserRole,
+    VMAssignment,
+    VMCredential,
     completed_page_ids,
     create_engine,
     create_session_factory,
@@ -61,7 +75,11 @@ def _template_context(
     user: User | None = None,
 ) -> dict[str, object]:
     safe_user = (
-        {"username": user.username, "role": user.role}
+        {
+            "username": user.username,
+            "display_name": user.display_name,
+            "role": user.role,
+        }
         if user is not None
         else None
     )
@@ -154,6 +172,82 @@ def _progress_context(db: Session, user: User, workshop: Workshop) -> dict[str, 
             "total": total,
             "percentage": percentage,
         },
+    }
+
+
+def _admin_data(db: Session, workshop: Workshop) -> dict[str, object]:
+    """Load the complete current attendee and VM overview for an administrator."""
+
+    attendees = db.scalars(
+        select(User)
+        .where(User.role == UserRole.ATTENDEE.value)
+        .order_by(User.username)
+    ).all()
+    attendee_ids = tuple(attendee.id for attendee in attendees)
+    page_ids = tuple(page.id for page in workshop.pages)
+
+    active_assignments = db.scalars(
+        select(VMAssignment)
+        .options(joinedload(VMAssignment.vm_credential))
+        .where(VMAssignment.active.is_(True))
+    ).all()
+    assignment_by_attendee = {
+        assignment.attendee_id: assignment for assignment in active_assignments
+    }
+    assignment_by_vm = {
+        assignment.vm_credential_id: assignment for assignment in active_assignments
+    }
+
+    completed_counts: dict[int, int] = {}
+    last_progress: dict[int, object] = {}
+    if attendee_ids and page_ids:
+        completed_counts = {
+            attendee_id: int(count)
+            for attendee_id, count in db.execute(
+                select(CourseProgress.attendee_id, func.count(CourseProgress.id))
+                .where(
+                    CourseProgress.attendee_id.in_(attendee_ids),
+                    CourseProgress.page_id.in_(page_ids),
+                    CourseProgress.completed.is_(True),
+                )
+                .group_by(CourseProgress.attendee_id)
+            ).all()
+        }
+        last_progress = {
+            attendee_id: timestamp
+            for attendee_id, timestamp in db.execute(
+                select(CourseProgress.attendee_id, func.max(CourseProgress.updated_at))
+                .where(
+                    CourseProgress.attendee_id.in_(attendee_ids),
+                    CourseProgress.page_id.in_(page_ids),
+                )
+                .group_by(CourseProgress.attendee_id)
+            ).all()
+            if timestamp is not None
+        }
+
+    attendee_rows = [
+        {
+            "user": attendee,
+            "assignment": assignment_by_attendee.get(attendee.id),
+            "completed": completed_counts.get(attendee.id, 0),
+            "total": len(page_ids),
+            "last_progress": last_progress.get(attendee.id),
+        }
+        for attendee in attendees
+    ]
+    vm_credentials = db.scalars(select(VMCredential).order_by(VMCredential.id)).all()
+    vm_rows = [
+        {
+            "credential": credential,
+            "assignment": assignment_by_vm.get(credential.id),
+        }
+        for credential in vm_credentials
+    ]
+    return {
+        "attendees": attendees,
+        "attendee_rows": attendee_rows,
+        "vm_rows": vm_rows,
     }
 
 
@@ -321,14 +415,338 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
         return templates.TemplateResponse(request=request, name="portal.html", context=context)
 
-    @app.get("/admin", response_class=HTMLResponse)
-    @app.get("/admin/protected", response_class=HTMLResponse)
-    async def admin_page(request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
-        user = require_role(db, request, UserRole.ADMIN)
+    def _admin_page_response(
+        request: Request,
+        db: Session,
+        user: User,
+        *,
+        notice: str | None = None,
+        error: str | None = None,
+        form_values: dict[str, str] | None = None,
+        response_status: int = status.HTTP_200_OK,
+    ) -> Response:
         context = _template_context(
             request, settings=runtime_settings, workshop=workshop, user=user
         )
-        return templates.TemplateResponse(request=request, name="admin.html", context=context)
+        context.update(_admin_data(db, workshop))
+        context["admin_notice"] = notice
+        context["admin_error"] = error
+        context["admin_form_values"] = form_values or {}
+        return templates.TemplateResponse(
+            request=request,
+            name="admin.html",
+            context=context,
+            status_code=response_status,
+        )
+
+    def _admin_redirect(message: str) -> RedirectResponse:
+        return RedirectResponse(
+            url=f"/admin?notice={quote(message, safe='')}",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+
+    def _attendee_or_404(db: Session, attendee_id: int) -> User:
+        attendee = db.get(User, attendee_id)
+        if attendee is None or attendee.role != UserRole.ATTENDEE.value:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attendee not found")
+        return attendee
+
+    @app.get("/admin", response_class=HTMLResponse)
+    @app.get("/admin/protected", response_class=HTMLResponse)
+    @app.get("/admin/attendees", response_class=HTMLResponse)
+    @app.get("/admin/vms", response_class=HTMLResponse)
+    async def admin_page(
+        request: Request,
+        notice: str | None = Query(default=None),
+        db: Session = Depends(get_db),
+    ) -> Response:
+        user = require_role(db, request, UserRole.ADMIN)
+        return _admin_page_response(request, db, user, notice=notice)
+
+    @app.post("/admin/attendees/create", response_class=HTMLResponse)
+    async def create_attendee(
+        request: Request,
+        username: str = Form(default=""),
+        password: str = Form(default=""),
+        password_confirmation: str = Form(default=""),
+        display_name: str = Form(default=""),
+        submitted_csrf_token: str = Form(default="", alias="csrf_token"),
+        db: Session = Depends(get_db),
+    ) -> Response:
+        admin = require_role(db, request, UserRole.ADMIN)
+        validate_csrf(request, submitted_csrf_token)
+        form_values = {
+            "attendee_username": username,
+            "attendee_display_name": display_name,
+        }
+        if password_confirmation and password_confirmation != password:
+            return _admin_page_response(
+                request,
+                db,
+                admin,
+                error="Password confirmation does not match",
+                form_values=form_values,
+                response_status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            create_user(
+                db,
+                username=username,
+                password=password,
+                display_name=display_name,
+                role=UserRole.ATTENDEE,
+            )
+        except ValueError as exc:
+            db.rollback()
+            message = str(exc)
+            if "Username" in message or "username" in message:
+                message = "Username cannot be empty" if not username.strip() else message
+            return _admin_page_response(
+                request,
+                db,
+                admin,
+                error=message,
+                form_values=form_values,
+                response_status=status.HTTP_400_BAD_REQUEST,
+            )
+        except IntegrityError:
+            db.rollback()
+            return _admin_page_response(
+                request,
+                db,
+                admin,
+                error="That username is already in use",
+                form_values=form_values,
+                response_status=status.HTTP_400_BAD_REQUEST,
+            )
+        return _admin_redirect("Attendee account created")
+
+    @app.post("/admin/attendees/{attendee_id}/password", response_class=HTMLResponse)
+    async def replace_attendee_password(
+        request: Request,
+        attendee_id: int,
+        password: str = Form(default=""),
+        new_password: str = Form(default=""),
+        password_confirmation: str = Form(default=""),
+        submitted_csrf_token: str = Form(default="", alias="csrf_token"),
+        db: Session = Depends(get_db),
+    ) -> Response:
+        admin = require_role(db, request, UserRole.ADMIN)
+        validate_csrf(request, submitted_csrf_token)
+        attendee = _attendee_or_404(db, attendee_id)
+        replacement = new_password or password
+        if password_confirmation and password_confirmation != replacement:
+            return _admin_page_response(
+                request,
+                db,
+                admin,
+                error=f"Password confirmation does not match for {attendee.username}",
+                response_status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not replacement:
+            return _admin_page_response(
+                request,
+                db,
+                admin,
+                error=f"Replacement password cannot be empty for {attendee.username}",
+                response_status=status.HTTP_400_BAD_REQUEST,
+            )
+        attendee.password_hash = hash_password(replacement)
+        attendee.session_version += 1
+        db.commit()
+        return _admin_redirect(f"Password replaced for {attendee.username}")
+
+    @app.post("/admin/attendees/{attendee_id}/profile", response_class=HTMLResponse)
+    async def update_attendee_profile(
+        request: Request,
+        attendee_id: int,
+        display_name: str = Form(default=""),
+        submitted_csrf_token: str = Form(default="", alias="csrf_token"),
+        db: Session = Depends(get_db),
+    ) -> Response:
+        admin = require_role(db, request, UserRole.ADMIN)
+        validate_csrf(request, submitted_csrf_token)
+        attendee = _attendee_or_404(db, attendee_id)
+        normalized_display_name = display_name.strip()
+        if len(normalized_display_name) > 150:
+            return _admin_page_response(
+                request,
+                db,
+                admin,
+                error="Display name cannot be longer than 150 characters",
+                response_status=status.HTTP_400_BAD_REQUEST,
+            )
+        attendee.display_name = normalized_display_name or None
+        db.commit()
+        return _admin_redirect(f"Details updated for {attendee.username}")
+
+    @app.post("/admin/attendees/{attendee_id}/status", response_class=HTMLResponse)
+    async def update_attendee_status(
+        request: Request,
+        attendee_id: int,
+        active: str = Form(default=""),
+        is_active: str = Form(default=""),
+        action: str = Form(default=""),
+        submitted_csrf_token: str = Form(default="", alias="csrf_token"),
+        db: Session = Depends(get_db),
+    ) -> Response:
+        admin = require_role(db, request, UserRole.ADMIN)
+        validate_csrf(request, submitted_csrf_token)
+        attendee = _attendee_or_404(db, attendee_id)
+        requested = active or is_active or action
+        normalized = requested.strip().casefold()
+        if normalized in {"1", "true", "on", "yes", "activate", "active"}:
+            desired_active = True
+        elif normalized in {"0", "false", "off", "no", "deactivate", "inactive"}:
+            desired_active = False
+        else:
+            return _admin_page_response(
+                request,
+                db,
+                admin,
+                error="Choose whether the attendee should be active",
+                response_status=status.HTTP_400_BAD_REQUEST,
+            )
+        if attendee.is_active != desired_active:
+            attendee.is_active = desired_active
+            attendee.session_version += 1
+            db.commit()
+        state = "activated" if desired_active else "deactivated"
+        return _admin_redirect(f"{attendee.username} {state}")
+
+    @app.post("/admin/vms/create", response_class=HTMLResponse)
+    async def create_vm(
+        request: Request,
+        host: str = Form(default=""),
+        ssh_username: str = Form(default=""),
+        ssh_password: str = Form(default=""),
+        password_confirmation: str = Form(default=""),
+        submitted_csrf_token: str = Form(default="", alias="csrf_token"),
+        db: Session = Depends(get_db),
+    ) -> Response:
+        admin = require_role(db, request, UserRole.ADMIN)
+        validate_csrf(request, submitted_csrf_token)
+        form_values = {"vm_host": host, "vm_ssh_username": ssh_username}
+        if password_confirmation and password_confirmation != ssh_password:
+            return _admin_page_response(
+                request,
+                db,
+                admin,
+                error="VM password confirmation does not match",
+                form_values=form_values,
+                response_status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            create_vm_credential(
+                db,
+                host=host,
+                ssh_username=ssh_username,
+                ssh_password=ssh_password,
+                encryption_key=runtime_settings.vm_encryption_key,
+            )
+        except ValueError as exc:
+            db.rollback()
+            return _admin_page_response(
+                request,
+                db,
+                admin,
+                error=str(exc),
+                form_values=form_values,
+                response_status=status.HTTP_400_BAD_REQUEST,
+            )
+        return _admin_redirect("VM credential created")
+
+    @app.post("/admin/vms/{vm_credential_id}/edit", response_class=HTMLResponse)
+    async def edit_vm(
+        request: Request,
+        vm_credential_id: int,
+        host: str = Form(default=""),
+        ssh_username: str = Form(default=""),
+        ssh_password: str = Form(default=""),
+        password: str = Form(default=""),
+        password_confirmation: str = Form(default=""),
+        submitted_csrf_token: str = Form(default="", alias="csrf_token"),
+        db: Session = Depends(get_db),
+    ) -> Response:
+        admin = require_role(db, request, UserRole.ADMIN)
+        validate_csrf(request, submitted_csrf_token)
+        credential = db.get(VMCredential, vm_credential_id)
+        if credential is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="VM credential not found"
+            )
+        replacement = ssh_password or password
+        form_values = {"vm_host": host, "vm_ssh_username": ssh_username}
+        if password_confirmation and password_confirmation != replacement:
+            return _admin_page_response(
+                request,
+                db,
+                admin,
+                error="VM password confirmation does not match",
+                form_values=form_values,
+                response_status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            update_vm_credential(
+                db,
+                vm_credential_id=vm_credential_id,
+                host=host,
+                ssh_username=ssh_username,
+                ssh_password=replacement or None,
+                encryption_key=runtime_settings.vm_encryption_key,
+            )
+        except ValueError as exc:
+            db.rollback()
+            return _admin_page_response(
+                request,
+                db,
+                admin,
+                error=str(exc),
+                form_values=form_values,
+                response_status=status.HTTP_400_BAD_REQUEST,
+            )
+        return _admin_redirect("VM credential updated")
+
+    @app.post("/admin/vms/{vm_credential_id}/assignment", response_class=HTMLResponse)
+    async def assign_vm(
+        request: Request,
+        vm_credential_id: int,
+        attendee_id: str = Form(default=""),
+        assigned_attendee_id: str = Form(default=""),
+        submitted_csrf_token: str = Form(default="", alias="csrf_token"),
+        db: Session = Depends(get_db),
+    ) -> Response:
+        admin = require_role(db, request, UserRole.ADMIN)
+        validate_csrf(request, submitted_csrf_token)
+        selected_attendee_id = attendee_id or assigned_attendee_id
+        try:
+            target_id = int(selected_attendee_id) if selected_attendee_id.strip() else None
+        except ValueError:
+            return _admin_page_response(
+                request,
+                db,
+                admin,
+                error="Select a valid attendee for the VM assignment",
+                response_status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            reassign_vm_credential(
+                db, vm_credential_id=vm_credential_id, attendee_id=target_id
+            )
+        except ValueError as exc:
+            db.rollback()
+            return _admin_page_response(
+                request,
+                db,
+                admin,
+                error=str(exc),
+                response_status=status.HTTP_400_BAD_REQUEST,
+            )
+        if target_id is None:
+            return _admin_redirect("VM credential unassigned")
+        target = db.get(User, target_id)
+        target_name = target.username if target is not None else "attendee"
+        return _admin_redirect(f"VM credential assigned to {target_name}")
 
     @app.get("/attendee", response_class=HTMLResponse)
     async def attendee_page(request: Request, db: Session = Depends(get_db)) -> Response:

@@ -56,14 +56,17 @@ def initialize_database(engine: Engine) -> None:
     """
 
     Base.metadata.create_all(engine)
-    # ``create_all`` intentionally does not alter an existing table. Keep the one
-    # schema change made during this increment compatible with a database initialized
-    # by an earlier development revision.
+    # ``create_all`` intentionally does not alter an existing table. Keep the small
+    # schema changes made during this increment compatible with an earlier database.
     with engine.begin() as connection:
         user_columns = {column["name"] for column in inspect(connection).get_columns("users")}
         if "session_version" not in user_columns:
             connection.exec_driver_sql(
                 "ALTER TABLE users ADD COLUMN session_version INTEGER NOT NULL DEFAULT 0"
+            )
+        if "display_name" not in user_columns:
+            connection.exec_driver_sql(
+                "ALTER TABLE users ADD COLUMN display_name VARCHAR(150)"
             )
 
 

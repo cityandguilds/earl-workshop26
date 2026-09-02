@@ -3,9 +3,166 @@
 {% block title %}Admin · {{ workshop.title }}{% endblock %}
 
 {% block content %}
-<section class="auth-card" aria-labelledby="admin-title">
+<section class="admin-page" aria-labelledby="admin-title">
   <p class="eyebrow">Administrator area</p>
   <h1 id="admin-title">Portal administration</h1>
-  <p>Signed in as {{ current_user.username }}. Account management and VM workflows are reserved for later increments.</p>
+  <p class="admin-intro">Manage attendee access, manually entered VM credentials, assignments, and progress for the current course.</p>
+
+  {% if admin_notice %}<p class="form-success" role="status">{{ admin_notice }}</p>{% endif %}
+  {% if admin_error %}<p class="form-error" role="alert">{{ admin_error }}</p>{% endif %}
+
+  <div class="admin-panels">
+    <section class="admin-panel" aria-labelledby="new-attendee-title">
+      <p class="eyebrow">Accounts</p>
+      <h2 id="new-attendee-title">Create attendee</h2>
+      <form class="admin-form" method="post" action="/admin/attendees/create">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <label for="attendee-username">Username</label>
+        <input id="attendee-username" name="username" value="{{ admin_form_values.attendee_username | default('', true) }}" autocomplete="username" required>
+        <label for="attendee-display-name">Display name <span>(optional)</span></label>
+        <input id="attendee-display-name" name="display_name" value="{{ admin_form_values.attendee_display_name | default('', true) }}" autocomplete="name">
+        <label for="attendee-password">Initial password</label>
+        <input id="attendee-password" name="password" type="password" autocomplete="new-password" required>
+        <label for="attendee-password-confirmation">Confirm password <span>(optional)</span></label>
+        <input id="attendee-password-confirmation" name="password_confirmation" type="password" autocomplete="new-password">
+        <button class="button" type="submit">Create attendee</button>
+      </form>
+    </section>
+
+    <section class="admin-panel" aria-labelledby="new-vm-title">
+      <p class="eyebrow">Infrastructure</p>
+      <h2 id="new-vm-title">Create VM credential</h2>
+      <p class="admin-help">VMs are entered manually in v0.1.0; provisioning is deferred.</p>
+      <form class="admin-form" method="post" action="/admin/vms/create">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <label for="vm-host">Host / IP</label>
+        <input id="vm-host" name="host" value="{{ admin_form_values.vm_host | default('', true) }}" autocomplete="url" required>
+        <label for="vm-ssh-username">SSH username</label>
+        <input id="vm-ssh-username" name="ssh_username" value="{{ admin_form_values.vm_ssh_username | default('', true) }}" autocomplete="username" required>
+        <label for="vm-ssh-password">SSH password</label>
+        <input id="vm-ssh-password" name="ssh_password" type="password" autocomplete="new-password" required>
+        <label for="vm-password-confirmation">Confirm password <span>(optional)</span></label>
+        <input id="vm-password-confirmation" name="password_confirmation" type="password" autocomplete="new-password">
+        <button class="button" type="submit">Create VM credential</button>
+      </form>
+    </section>
+  </div>
+
+  <section class="admin-panel admin-table-panel" aria-labelledby="attendees-title">
+    <div class="admin-section-heading">
+      <div>
+        <p class="eyebrow">People</p>
+        <h2 id="attendees-title">Attendees</h2>
+      </div>
+      <span>{{ attendee_rows | length }} account{% if attendee_rows | length != 1 %}s{% endif %}</span>
+    </div>
+    {% if attendee_rows %}
+    <div class="table-scroll">
+      <table class="admin-table">
+        <caption class="sr-only">Attendee accounts, VM assignments, and current course progress</caption>
+        <thead>
+          <tr><th scope="col">Attendee</th><th scope="col">State</th><th scope="col">VM</th><th scope="col">Progress</th><th scope="col">Last progress</th><th scope="col">Account actions</th></tr>
+        </thead>
+        <tbody>
+          {% for row in attendee_rows %}
+          <tr>
+            <th scope="row">
+              <strong>{{ row.user.display_name or row.user.username }}</strong>
+              <small>{{ row.user.username }}</small>
+            </th>
+            <td>{% if row.user.is_active %}<span class="state-active">Active</span>{% else %}<span class="state-inactive">Inactive</span>{% endif %}</td>
+            <td>{% if row.assignment %}<code>{{ row.assignment.vm_credential.host }}</code>{% else %}<span class="muted">Unassigned</span>{% endif %}</td>
+            <td><strong>{{ row.completed }} / {{ row.total }}</strong> pages</td>
+            <td>{{ row.last_progress.strftime('%Y-%m-%d %H:%M') if row.last_progress else 'Not started' }}</td>
+            <td>
+              <div class="admin-actions">
+                <form method="post" action="/admin/attendees/{{ row.user.id }}/profile">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <label class="sr-only" for="display-name-{{ row.user.id }}">Display name for {{ row.user.username }}</label>
+                  <input id="display-name-{{ row.user.id }}" name="display_name" value="{{ row.user.display_name or '' }}" placeholder="Display name">
+                  <button class="button secondary" type="submit">Save name</button>
+                </form>
+                <form method="post" action="/admin/attendees/{{ row.user.id }}/password">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <label class="sr-only" for="password-{{ row.user.id }}">Replacement password for {{ row.user.username }}</label>
+                  <input id="password-{{ row.user.id }}" name="password" type="password" placeholder="New password" autocomplete="new-password" required>
+                  <label class="sr-only" for="password-confirmation-{{ row.user.id }}">Confirm replacement password for {{ row.user.username }}</label>
+                  <input id="password-confirmation-{{ row.user.id }}" name="password_confirmation" type="password" placeholder="Confirm password" autocomplete="new-password">
+                  <button class="button secondary" type="submit">Replace password</button>
+                </form>
+                <form method="post" action="/admin/attendees/{{ row.user.id }}/status">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <input type="hidden" name="active" value="{{ 'false' if row.user.is_active else 'true' }}">
+                  <button class="button secondary" type="submit">{% if row.user.is_active %}Deactivate{% else %}Activate{% endif %}</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="muted">No attendee accounts have been created yet.</p>
+    {% endif %}
+  </section>
+
+  <section class="admin-panel admin-table-panel" aria-labelledby="vms-title">
+    <div class="admin-section-heading">
+      <div>
+        <p class="eyebrow">VM credentials</p>
+        <h2 id="vms-title">VM credentials and assignments</h2>
+      </div>
+      <span>{{ vm_rows | length }} credential{% if vm_rows | length != 1 %}s{% endif %}</span>
+    </div>
+    <p class="admin-help">Passwords are encrypted at rest and are never shown in this list. Leave the replacement password blank to keep the existing one.</p>
+    {% if vm_rows %}
+    <div class="table-scroll">
+      <table class="admin-table vm-table">
+        <caption class="sr-only">VM credentials and their current attendee assignments</caption>
+        <thead>
+          <tr><th scope="col">Connection</th><th scope="col">Assignment</th><th scope="col">Edit credential</th><th scope="col">Assign or unassign</th></tr>
+        </thead>
+        <tbody>
+          {% for row in vm_rows %}
+          <tr>
+            <th scope="row"><strong>{{ row.credential.host }}</strong><small>SSH: {{ row.credential.ssh_username }} · ID {{ row.credential.id }}</small></th>
+            <td>{% if row.assignment %}{{ row.assignment.attendee.username }}{% else %}<span class="muted">Unassigned</span>{% endif %}</td>
+            <td>
+              <form class="admin-form compact-form" method="post" action="/admin/vms/{{ row.credential.id }}/edit">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <label class="sr-only" for="host-{{ row.credential.id }}">Host for VM {{ row.credential.id }}</label>
+                <input id="host-{{ row.credential.id }}" name="host" value="{{ row.credential.host }}" required>
+                <label class="sr-only" for="ssh-username-{{ row.credential.id }}">SSH username for VM {{ row.credential.id }}</label>
+                <input id="ssh-username-{{ row.credential.id }}" name="ssh_username" value="{{ row.credential.ssh_username }}" required>
+                <label class="sr-only" for="ssh-password-{{ row.credential.id }}">Replacement SSH password for VM {{ row.credential.id }}</label>
+                <input id="ssh-password-{{ row.credential.id }}" name="ssh_password" type="password" placeholder="Replacement password" autocomplete="new-password">
+                <label class="sr-only" for="ssh-password-confirmation-{{ row.credential.id }}">Confirm replacement SSH password for VM {{ row.credential.id }}</label>
+                <input id="ssh-password-confirmation-{{ row.credential.id }}" name="password_confirmation" type="password" placeholder="Confirm password" autocomplete="new-password">
+                <button class="button secondary" type="submit">Save VM</button>
+              </form>
+            </td>
+            <td>
+              <form class="admin-form compact-form" method="post" action="/admin/vms/{{ row.credential.id }}/assignment">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <label class="sr-only" for="assignment-{{ row.credential.id }}">Attendee for VM {{ row.credential.id }}</label>
+                <select id="assignment-{{ row.credential.id }}" name="attendee_id">
+                  <option value="">Unassigned</option>
+                  {% for attendee in attendees %}
+                  <option value="{{ attendee.id }}"{% if row.assignment and row.assignment.attendee_id == attendee.id %} selected{% endif %}>{{ attendee.display_name or attendee.username }}{% if not attendee.is_active %} (inactive){% endif %}</option>
+                  {% endfor %}
+                </select>
+                <button class="button secondary" type="submit">Save assignment</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="muted">No VM credentials have been entered yet.</p>
+    {% endif %}
+  </section>
 </section>
 {% endblock %}
