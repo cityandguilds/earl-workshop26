@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block title %}Your VM · {{ workshop.title }}{% endblock %}
+
+{% block content %}
+<section class="dashboard" aria-labelledby="attendee-title">
+  <p class="eyebrow">Attendee dashboard</p>
+  <h1 id="attendee-title">Your workshop VM</h1>
+  <p class="dashboard-intro">Use the connection details below to access the VM assigned to you.</p>
+
+  {% if credential_error %}
+  <section class="callout credential-error" role="alert" aria-labelledby="credential-error-title">
+    <span class="callout-mark">!</span>
+    <div>
+      <h2 id="credential-error-title">Connection details unavailable</h2>
+      <p>{{ credential_error }}</p>
+    </div>
+  </section>
+  {% elif vm_connection %}
+  <section class="connection-card" aria-labelledby="connection-title">
+    <div class="connection-heading">
+      <div>
+        <p class="eyebrow">Assigned connection</p>
+        <h2 id="connection-title">Connect securely</h2>
+      </div>
+      <span class="assignment-badge">Ready</span>
+    </div>
+
+    <dl class="credential-list">
+      <div class="credential-row">
+        <dt>Host / IP</dt>
+        <dd>
+          <code id="vm-host" class="credential-value" tabindex="0">{{ vm_connection.host }}</code>
+          <button class="copy-button" type="button" data-copy-target="vm-host" data-copy-label="Host">Copy host</button>
+        </dd>
+      </div>
+      <div class="credential-row">
+        <dt>SSH username</dt>
+        <dd>
+          <code id="vm-username" class="credential-value" tabindex="0">{{ vm_connection.ssh_username }}</code>
+          <button class="copy-button" type="button" data-copy-target="vm-username" data-copy-label="Username">Copy username</button>
+        </dd>
+      </div>
+      <div class="credential-row">
+        <dt>SSH password</dt>
+        <dd>
+          <code id="vm-password" class="credential-value" tabindex="0">{{ vm_connection.ssh_password }}</code>
+          <button class="copy-button" type="button" data-copy-target="vm-password" data-copy-label="Password">Copy password</button>
+        </dd>
+      </div>
+    </dl>
+
+    <div class="ssh-example">
+      <p class="eyebrow">Example command</p>
+      <code id="ssh-command">ssh {{ vm_connection.ssh_username }}@{{ vm_connection.host }}</code>
+      <button class="copy-button" type="button" data-copy-target="ssh-command" data-copy-label="SSH command">Copy command</button>
+    </div>
+    <p class="copy-status" data-copy-status aria-live="polite"></p>
+  </section>
+  {% else %}
+  <section class="waiting-panel" role="status" aria-labelledby="waiting-title">
+    <p class="eyebrow">Assignment pending</p>
+    <h2 id="waiting-title">Your VM is not assigned yet</h2>
+    <p>The workshop team has not assigned a VM to your account. This page will update with connection details when one is ready.</p>
+  </section>
+  {% endif %}
+</section>
+{% if vm_connection %}<script src="/static/attendee.js" defer></script>{% endif %}
+{% endblock %}

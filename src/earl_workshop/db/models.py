@@ -5,8 +5,19 @@ from __future__ import annotations
 from datetime import datetime
 from enum import StrEnum
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, Integer, String, Text, func, text
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    func,
+    text,
+)
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
 class Base(DeclarativeBase):
@@ -21,7 +32,7 @@ class UserRole(StrEnum):
 
 
 class User(Base):
-    """A portal account; VM credentials are deliberately not part of this model."""
+    """A portal account with a role used by server-side authorization."""
 
     __tablename__ = "users"
     __table_args__ = (
@@ -40,4 +51,68 @@ class User(Base):
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    vm_assignments: Mapped[list[VMAssignment]] = relationship(
+        "VMAssignment", back_populates="attendee"
+    )
+
+
+class VMCredential(Base):
+    """Connection details for one workshop VM.
+
+    The SSH password is represented only by ``encrypted_password``. Plaintext is
+    accepted by the persistence service and decrypted only for an authorized
+    attendee dashboard response.
+    """
+
+    __tablename__ = "vm_credentials"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    host: Mapped[str] = mapped_column(String(255), nullable=False)
+    ssh_username: Mapped[str] = mapped_column(String(150), nullable=False)
+    encrypted_password: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    assignments: Mapped[list[VMAssignment]] = relationship(
+        "VMAssignment", back_populates="vm_credential"
+    )
+
+
+class VMAssignment(Base):
+    """The active attendee-to-VM relationship used for credential authorization."""
+
+    __tablename__ = "vm_assignments"
+    __table_args__ = (
+        CheckConstraint("active IN (0, 1)", name="ck_vm_assignments_active"),
+        Index(
+            "uq_vm_assignments_one_active_per_attendee",
+            "attendee_id",
+            unique=True,
+            sqlite_where=text("active = 1"),
+        ),
+        Index(
+            "uq_vm_assignments_one_active_per_vm",
+            "vm_credential_id",
+            unique=True,
+            sqlite_where=text("active = 1"),
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    attendee_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    vm_credential_id: Mapped[int] = mapped_column(
+        ForeignKey("vm_credentials.id"), nullable=False, index=True
+    )
+    active: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=text("1")
+    )
+    assigned_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    attendee: Mapped[User] = relationship("User", back_populates="vm_assignments")
+    vm_credential: Mapped[VMCredential] = relationship(
+        "VMCredential", back_populates="assignments"
     )

@@ -28,6 +28,7 @@ from .auth import (
 )
 from .config import Settings
 from .course import CoursePage, Workshop, load_workshop
+from .credentials import VMEncryptionError, attendee_connection, validate_vm_encryption_key
 from .db import User, UserRole, create_engine, create_session_factory, initialize_database
 
 # The canonical brand entry points are committed local assets. The SVG and PNG both use
@@ -89,6 +90,10 @@ def _safe_next_path(next_path: str | None) -> str:
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     runtime_settings = settings or Settings.from_env()
+    runtime_settings = replace(
+        runtime_settings,
+        vm_encryption_key=validate_vm_encryption_key(runtime_settings.vm_encryption_key),
+    )
     if not runtime_settings.session_secret:
         if runtime_settings.environment.strip().lower() in {"production", "prod"}:
             raise ValueError(
@@ -134,6 +139,31 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def healthz() -> dict[str, str]:
         return {"status": "ok"}
 
+    def _attendee_dashboard_response(request: Request, db: Session, user: User) -> Response:
+        context = _template_context(
+            request, settings=runtime_settings, workshop=workshop, user=user
+        )
+        try:
+            context["vm_connection"] = attendee_connection(
+                db,
+                attendee_id=user.id,
+                encryption_key=runtime_settings.vm_encryption_key,
+            )
+        except VMEncryptionError:
+            # Never render ciphertext or a partially decrypted credential. The generic
+            # message is intentionally safe for both browser output and application logs.
+            context["credential_error"] = (
+                "Your VM connection details are temporarily unavailable. Please contact the "
+                "workshop team."
+            )
+            return templates.TemplateResponse(
+                request=request,
+                name="attendee.html",
+                context=context,
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        return templates.TemplateResponse(request=request, name="attendee.html", context=context)
+
     @app.get("/", response_class=HTMLResponse)
     async def landing_page(request: Request) -> HTMLResponse:
         context = _template_context(request, settings=runtime_settings, workshop=workshop)
@@ -174,9 +204,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             )
 
         establish_session(request, db, user)
-        return RedirectResponse(
-            url=_safe_next_path(next_path), status_code=status.HTTP_303_SEE_OTHER
-        )
+        destination = _safe_next_path(next_path)
+        if destination == "/" and user.role == UserRole.ATTENDEE.value:
+            destination = "/attendee"
+        return RedirectResponse(url=destination, status_code=status.HTTP_303_SEE_OTHER)
 
     @app.post("/logout")
     async def logout(
@@ -194,8 +225,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/portal", response_class=HTMLResponse)
     async def portal_page(
         request: Request, db: Session = Depends(get_db)
-    ) -> HTMLResponse:
+    ) -> Response:
         user = require_authenticated_user(db, request)
+        if user.role == UserRole.ATTENDEE.value:
+            return _attendee_dashboard_response(request, db, user)
         context = _template_context(
             request, settings=runtime_settings, workshop=workshop, user=user
         )
@@ -211,12 +244,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return templates.TemplateResponse(request=request, name="admin.html", context=context)
 
     @app.get("/attendee", response_class=HTMLResponse)
-    async def attendee_page(request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
+    async def attendee_page(request: Request, db: Session = Depends(get_db)) -> Response:
         user = require_role(db, request, UserRole.ATTENDEE)
-        context = _template_context(
-            request, settings=runtime_settings, workshop=workshop, user=user
-        )
-        return templates.TemplateResponse(request=request, name="portal.html", context=context)
+        return _attendee_dashboard_response(request, db, user)
 
     @app.get("/course/{page_id}", response_class=HTMLResponse)
     async def course_page(request: Request, page_id: str) -> HTMLResponse:
@@ -239,4 +269,35 @@ def _neighbour(workshop: Workshop, page: CoursePage, *, offset: int) -> CoursePa
     return None
 
 
-app = create_app()
+def _configuration_error_app() -> FastAPI:
+    """Keep module imports safe while making an unconfigured deployment non-operational."""
+
+    unavailable_app = FastAPI(title="EARL Workshop Portal")
+
+    @unavailable_app.get("/healthz")
+    async def unavailable_healthz() -> Response:
+        return Response(
+            content='{"status":"unavailable"}',
+            media_type="application/json",
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+
+    @unavailable_app.api_route(
+        "/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+    )
+    async def unavailable_route() -> Response:
+        return Response(
+            content="Application configuration is unavailable.",
+            media_type="text/plain",
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+
+    return unavailable_app
+
+
+try:
+    app = create_app()
+except VMEncryptionError:
+    # ``uvicorn earl_workshop.main:app`` remains importable for operators, but no request
+    # can reach application functionality until the dedicated key is configured.
+    app = _configuration_error_app()

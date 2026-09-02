@@ -21,7 +21,7 @@ The installed console entry point is also available:
 uv run earl-workshop serve
 ```
 
-The portal now includes application-managed user persistence and portal authentication. VM credentials, attendee/VM assignment, and progress state are intentionally reserved for later implementation slices.
+The portal includes application-managed user persistence, portal authentication, and an attendee VM-credentials dashboard. VM passwords are encrypted at rest with a dedicated Fernet key; administrator assignment forms are intentionally deferred.
 
 ## Repository layout
 
@@ -81,12 +81,19 @@ EARL_WORKSHOP_PUBLIC_BASE_URL
 EARL_WORKSHOP_ENVIRONMENT
 EARL_WORKSHOP_SECURE_COOKIES
 EARL_WORKSHOP_SESSION_SECRET
+EARL_WORKSHOP_VM_ENCRYPTION_KEY
 EARL_WORKSHOP_DATABASE_PATH
 ```
 
 Runtime data defaults to `.data/` in a source checkout and is ignored by Git. The SQLite database defaults to `.data/earl_workshop.sqlite3`; set `EARL_WORKSHOP_DATA_DIR` to place the whole runtime directory elsewhere, or set `EARL_WORKSHOP_DATABASE_PATH` for an explicit SQLite path. Both locations must be writable and should be outside installed package files. The application creates the directory and current schema automatically on startup; initialization is safe to rerun against an existing database.
 
 Set `EARL_WORKSHOP_SESSION_SECRET` to a long random value for any deployed application. Production refuses to start without it. In development and tests, an unconfigured process gets a random in-process secret so it cannot silently use a predictable shared signing key; sessions from that process do not survive a restart. Set `EARL_WORKSHOP_SECURE_COOKIES=true` when serving through HTTPS. Session cookies are HttpOnly, signed, and SameSite=Lax.
+
+Set `EARL_WORKSHOP_VM_ENCRYPTION_KEY` to a generated Fernet key before starting the application. It is required in every environment and invalid or missing values make the application unavailable rather than falling back to plaintext. Generate one with:
+
+```bash
+uv run python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
 
 ## Accounts and authentication
 
@@ -98,7 +105,7 @@ EARL_WORKSHOP_DATA_DIR=.data uv run earl-workshop create-admin
 
 The command prompts for a username, password, and confirmation. Portal roles are `admin` and `attendee`; administrator-only server routes return an authorization failure to attendees and anonymous requests. Login errors intentionally use one generic message, and inactive accounts cannot establish a session. Login and logout forms carry a token bound to the signed session; missing or invalid CSRF tokens are rejected.
 
-Portal account passwords are stored only as one-way Argon2 password hashes. They are not logged or returned by the application. These portal passwords are distinct from any future VM credentials, which are outside this slice and are not stored in the user model.
+Portal account passwords are stored only as one-way Argon2 password hashes. They are not logged or returned by the application. VM passwords are a different credential type: they must be recoverable for the assigned attendee, so they are encrypted with `EARL_WORKSHOP_VM_ENCRYPTION_KEY` before being stored in the `vm_credentials.encrypted_password` field and decrypted only for that attendee's dashboard. The `vm_credentials` model stores the host and SSH username alongside that ciphertext; `vm_assignments` links a credential to an attendee and tracks whether it is active, with database uniqueness allowing at most one active VM per attendee and one active attendee per VM. Assignment lookup uses the authenticated session identity and never accepts an attendee-supplied record ID. An attendee without an active assignment sees a waiting state.
 
 Build an installable wheel with:
 
@@ -110,4 +117,4 @@ The wheel includes the package templates/CSS plus the current placeholder conten
 
 ## Deferred infrastructure
 
-This increment intentionally does not implement VM credentials or assignments, progress tracking, administrator account-management UI, resource download routes, DigitalOcean/Terraform provisioning, monitoring, production bootstrap automation, final curriculum, domain/TLS automation, or conference deployment. It also does not require Node.js.
+This v0.1.0 increment intentionally does not implement administrator forms for creating or assigning VM records, VM provisioning, SSH connectivity checks, VM health monitoring, progress tracking, resource download routes, DigitalOcean/Terraform provisioning, production bootstrap automation, final curriculum, domain/TLS automation, or conference deployment. VM provisioning is not part of v0.1.0. It also does not require Node.js.

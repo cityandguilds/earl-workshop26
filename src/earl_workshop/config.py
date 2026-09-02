@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
+
+from .credentials import VM_ENCRYPTION_KEY_ENV, validate_vm_encryption_key
 
 PACKAGE_ROOT = Path(__file__).resolve().parent
 SOURCE_ROOT = PACKAGE_ROOT.parent.parent
@@ -47,7 +49,7 @@ class Settings:
     environment: str = "development"
     secure_cookies: bool = False
     session_secret: str | None = None
-    vm_encryption_key: str | None = None
+    vm_encryption_key: str | None = field(default=None, repr=False)
     database_path: Path | None = None
 
     @property
@@ -88,6 +90,7 @@ class Settings:
                 "EARL_WORKSHOP_SESSION_SECRET is required when EARL_WORKSHOP_ENVIRONMENT "
                 "is production"
             )
+        vm_encryption_key = validate_vm_encryption_key(os.getenv(VM_ENCRYPTION_KEY_ENV))
         return cls(
             root_dir=root_dir,
             content_dir=_env_path("EARL_WORKSHOP_CONTENT_DIR", content_default),
@@ -100,7 +103,7 @@ class Settings:
             environment=environment,
             secure_cookies=_env_bool("EARL_WORKSHOP_SECURE_COOKIES", False),
             session_secret=session_secret,
-            vm_encryption_key=os.getenv("EARL_WORKSHOP_VM_ENCRYPTION_KEY"),
+            vm_encryption_key=vm_encryption_key,
             database_path=(
                 Path(os.getenv("EARL_WORKSHOP_DATABASE_PATH")).expanduser()
                 if os.getenv("EARL_WORKSHOP_DATABASE_PATH")

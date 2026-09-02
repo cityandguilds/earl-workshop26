@@ -2,6 +2,7 @@ import re
 from pathlib import Path
 
 import pytest
+from cryptography.fernet import Fernet
 from fastapi.testclient import TestClient
 from sqlalchemy import inspect, select
 
@@ -13,6 +14,7 @@ from earl_workshop.db import User, UserRole, create_engine, initialize_database
 from earl_workshop.main import create_app
 
 CSRF_PATTERN = re.compile(r'name="csrf_token" value="([^"]+)"')
+TEST_VM_ENCRYPTION_KEY = Fernet.generate_key().decode()
 
 
 def settings_for(tmp_path: Path, *, secure_cookies: bool = False) -> Settings:
@@ -24,6 +26,7 @@ def settings_for(tmp_path: Path, *, secure_cookies: bool = False) -> Settings:
         data_dir=tmp_path / "runtime-data",
         secure_cookies=secure_cookies,
         session_secret="test-session-secret-which-is-long-enough",
+        vm_encryption_key=TEST_VM_ENCRYPTION_KEY,
     )
 
 

@@ -1,9 +1,12 @@
 from pathlib import Path
 
+from cryptography.fernet import Fernet
 from fastapi.testclient import TestClient
 
 from earl_workshop.config import Settings
 from earl_workshop.main import create_app
+
+TEST_VM_ENCRYPTION_KEY = Fernet.generate_key().decode()
 
 
 def test_settings_read_runtime_values_from_environment(monkeypatch) -> None:
@@ -11,6 +14,7 @@ def test_settings_read_runtime_values_from_environment(monkeypatch) -> None:
     monkeypatch.setenv("EARL_WORKSHOP_PORT", "8123")
     monkeypatch.setenv("EARL_WORKSHOP_PUBLIC_BASE_URL", "https://workshop.example/portal/")
     monkeypatch.setenv("EARL_WORKSHOP_SECURE_COOKIES", "true")
+    monkeypatch.setenv("EARL_WORKSHOP_VM_ENCRYPTION_KEY", TEST_VM_ENCRYPTION_KEY)
 
     settings = Settings.from_env()
 
@@ -28,6 +32,7 @@ def test_health_and_branded_landing_page(tmp_path: Path) -> None:
         asset_dir=Path("assets"),
         data_dir=tmp_path / "runtime-data",
         session_secret="test-session-secret-which-is-long-enough",
+        vm_encryption_key=TEST_VM_ENCRYPTION_KEY,
     )
     client = TestClient(create_app(settings))
 
@@ -64,6 +69,7 @@ def test_course_page_is_rendered_from_loaded_content(tmp_path: Path) -> None:
         asset_dir=Path("assets"),
         data_dir=tmp_path / "runtime-data",
         session_secret="test-session-secret-which-is-long-enough",
+        vm_encryption_key=TEST_VM_ENCRYPTION_KEY,
     )
     client = TestClient(create_app(settings))
 
@@ -90,6 +96,7 @@ def test_application_can_use_environment_style_external_content(tmp_path: Path) 
         resources_dir=tmp_path / "resources",
         asset_dir=Path("assets"),
         data_dir=tmp_path / "data",
+        vm_encryption_key=TEST_VM_ENCRYPTION_KEY,
     )
 
     response = TestClient(create_app(settings)).get("/")

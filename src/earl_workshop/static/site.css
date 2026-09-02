@@ -134,6 +134,58 @@ code { padding: 0.1rem 0.3rem; color: var(--ink); background: #E9ECEC; border-ra
 
 .form-error { padding: 0.75rem 1rem; color: #8E1025; background: #F1E5E7; border-left: 0.25rem solid var(--red); }
 
+.dashboard { max-width: 52rem; margin: 4rem auto 6rem; }
+
+.dashboard h1 { font-size: clamp(2.4rem, 5vw, 4.3rem); }
+
+.dashboard-intro { max-width: 38rem; margin: 1rem 0 2rem; color: var(--muted); font-size: 1.08rem; }
+
+.connection-card { padding: 1.6rem; background: var(--white); border: 1px solid var(--line); }
+
+.connection-heading { display: flex; align-items: start; justify-content: space-between; gap: 1rem; padding-bottom: 1.2rem; border-bottom: 1px solid var(--line); }
+
+.connection-heading h2 { font-size: clamp(1.7rem, 3vw, 2.35rem); }
+
+.assignment-badge { padding: 0.35rem 0.65rem; color: #0B6B3A; background: #E2F3EA; font-size: 0.77rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; }
+
+.credential-list { margin: 0; }
+
+.credential-row { display: grid; grid-template-columns: 9rem minmax(0, 1fr); gap: 1rem; align-items: center; padding: 1rem 0; border-bottom: 1px solid var(--line); }
+
+.credential-row dt { color: var(--muted); font-size: 0.87rem; font-weight: 700; }
+
+.credential-row dd { display: flex; align-items: center; justify-content: space-between; gap: 1rem; min-width: 0; margin: 0; }
+
+.credential-value { min-width: 0; overflow-wrap: anywhere; user-select: text; }
+
+.copy-button { flex: 0 0 auto; padding: 0.45rem 0.7rem; color: var(--ink); background: var(--white); border: 1px solid var(--line); cursor: pointer; font: inherit; font-size: 0.85rem; font-weight: 700; }
+
+.copy-button:hover, .copy-button:focus-visible { color: var(--red); border-color: var(--red); }
+
+.ssh-example { margin-top: 1.5rem; padding: 1rem; background: var(--ink); color: var(--white); }
+
+.ssh-example .eyebrow { margin-bottom: 0.45rem; color: #FFB2BE; }
+
+.ssh-example code { padding: 0; color: var(--white); background: transparent; overflow-wrap: anywhere; }
+
+.ssh-example .copy-button { margin-left: 0.8rem; color: var(--white); background: transparent; border-color: #7B858C; }
+
+.ssh-example .copy-button:hover, .ssh-example .copy-button:focus-visible { color: var(--white); border-color: var(--white); }
+
+.copy-status { min-height: 1.55em; margin: 0.8rem 0 0; color: var(--muted); font-size: 0.85rem; }
+
+.waiting-panel { padding: 1.8rem; background: var(--white); border: 1px solid var(--line); border-left: 0.35rem solid var(--red); }
+
+.waiting-panel h2 { font-size: clamp(1.7rem, 3vw, 2.35rem); }
+
+.waiting-panel p:last-child { max-width: 40rem; margin-bottom: 0; color: var(--muted); }
+
+.credential-error { margin: 2rem 0 0; }
+
+.credential-error h2 { margin: 0 0 0.4rem; font-size: 1.35rem; }
+
+.credential-error p { color: var(--muted); }
+
 .button { display: inline-block; padding: 0.65rem 1rem; color: var(--white); background: var(--red); text-decoration: none; font-weight: 700; }
 
 .button:hover, .button:focus-visible { background: #B9122D; }
@@ -158,4 +210,9 @@ code { padding: 0.1rem 0.3rem; color: var(--ink); background: #E9ECEC; border-ra
   .header-inner, .footer-inner { align-items: start; flex-direction: column; justify-content: center; padding: 0.8rem 0; }
   .brand-mark { width: 2.8rem; height: 2.8rem; }
   .page-navigation { align-items: stretch; flex-direction: column; }
+  .dashboard { margin-top: 2.5rem; }
+  .connection-card { padding: 1.1rem; }
+  .credential-row { grid-template-columns: 1fr; gap: 0.45rem; }
+  .credential-row dd { align-items: start; flex-direction: column; gap: 0.65rem; }
+  .ssh-example .copy-button { display: block; margin: 0.9rem 0 0; }
 }
