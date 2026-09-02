@@ -34,7 +34,7 @@ src/earl_workshop/      FastAPI app, loader, templates, and CSS
 tests/                  content and application foundation tests
 ```
 
-The supplied files under `assets/` are the branding authority. `assets/brand.md` currently approves `#E31837` as the primary colour and `#1D252D` as the secondary colour; the CSS uses those values and a system sans-serif fallback. The supplied `assets/cg-lion-news-cover-lion-jpg.jpg` is the only visual source and is reused unchanged through the canonical `assets/logo.svg` and `assets/favicon.png` aliases. Both URLs are served with the source image's JPEG media type. No external fonts, logos, CDN, or JavaScript framework is required.
+The supplied files under `assets/` are the branding authority. `assets/brand.md` currently approves `#E31837` as the primary colour and `#1D252D` as the secondary colour; the CSS uses those values and a system sans-serif fallback. The supplied `assets/cg-lion-news-cover-lion-jpg.jpg` is the visual source for the canonical local `assets/logo.svg` and `assets/favicon.png` files. The logo URL is served as SVG and the favicon URL as PNG; no external fonts, logos, CDN, or JavaScript framework is required.
 
 ## Authoring course content
 

@@ -35,16 +35,17 @@ def test_health_and_branded_landing_page() -> None:
     assert "/static/site.css" in landing.text
     logo_url = "/assets/logo.svg"
     favicon_url = "/assets/favicon.png"
-    assert f'<link rel="icon" href="{favicon_url}" type="image/jpeg">' in landing.text
+    assert f'<link rel="icon" href="{favicon_url}" type="image/png">' in landing.text
     assert landing.text.count(f'src="{logo_url}"') == 2
 
     logo = client.get(logo_url)
     favicon = client.get(favicon_url)
     assert logo.status_code == 200
     assert favicon.status_code == 200
-    assert logo.headers["content-type"].startswith("image/jpeg")
-    assert favicon.headers["content-type"].startswith("image/jpeg")
-    assert logo.content == favicon.content
+    assert logo.headers["content-type"].startswith("image/svg+xml")
+    assert favicon.headers["content-type"].startswith("image/png")
+    assert logo.content.lstrip().startswith(b"<svg")
+    assert favicon.content.startswith(b"\x89PNG\r\n\x1a\n")
 
 
 def test_course_page_is_rendered_from_loaded_content() -> None:

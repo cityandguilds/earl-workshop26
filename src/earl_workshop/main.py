@@ -13,9 +13,8 @@ from . import __version__
 from .config import Settings
 from .course import CoursePage, Workshop, load_workshop
 
-# The checkout contains one supplied visual asset. The canonical logo and favicon paths
-# are aliases to that same file, rather than generated or downloaded replacement artwork.
-BRAND_IMAGE_NAME = "cg-lion-news-cover-lion-jpg.jpg"
+# The canonical brand entry points are committed local assets. The SVG and PNG both use
+# the supplied City & Guilds lion artwork; no network or runtime asset generation is needed.
 BRAND_LOGO_NAME = "logo.svg"
 BRAND_FAVICON_NAME = "favicon.png"
 
@@ -52,13 +51,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get(f"/assets/{BRAND_LOGO_NAME}", include_in_schema=False)
     async def brand_logo() -> FileResponse:
-        return FileResponse(runtime_settings.asset_dir / BRAND_LOGO_NAME, media_type="image/jpeg")
+        return FileResponse(
+            runtime_settings.asset_dir / BRAND_LOGO_NAME, media_type="image/svg+xml"
+        )
 
     @app.get(f"/assets/{BRAND_FAVICON_NAME}", include_in_schema=False)
     async def brand_favicon() -> FileResponse:
-        return FileResponse(
-            runtime_settings.asset_dir / BRAND_FAVICON_NAME, media_type="image/jpeg"
-        )
+        return FileResponse(runtime_settings.asset_dir / BRAND_FAVICON_NAME, media_type="image/png")
 
     app.mount("/assets", StaticFiles(directory=runtime_settings.asset_dir), name="assets")
 

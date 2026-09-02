@@ -1,1 +1,5 @@
-favicon.png
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 909 510" role="img" aria-labelledby="logo-title logo-description">
+  <title id="logo-title">City &amp; Guilds</title>
+  <desc id="logo-description">City &amp; Guilds lion mark</desc>
+  <image href="cg-lion-news-cover-lion-jpg.jpg" width="909" height="510" preserveAspectRatio="xMidYMid meet" />
+</svg>
