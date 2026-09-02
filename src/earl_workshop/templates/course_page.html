@@ -11,24 +11,50 @@
 
 <article class="course-article">
   <header class="article-header">
-    <p class="eyebrow">{{ page.section }} · page {{ "%02d" | format(workshop.pages.index(page) + 1) }}</p>
+    <p class="eyebrow">{{ page.section }} · page {{ "%02d" | format(page_index + 1) }}</p>
     <h1>{{ page.title }}</h1>
     {% if page.resources %}
-    <div class="resources-panel" aria-label="Page resources">
-      <strong>Page resources</strong>
-      <ul>
-        {% for resource in page.resources %}
-        <li><span>{{ resource.label }}</span> <code>{{ resource.file }}</code></li>
-        {% endfor %}
-      </ul>
-    </div>
+    <details class="resources-menu">
+      <summary>Page resources ({{ page.resources | length }})</summary>
+      <div class="resources-panel" aria-label="Page resources">
+        <p class="resource-intro">Teaching files are public so you can fetch them from your VM.</p>
+        <ul>
+          {% for resource in resource_links %}
+          <li class="resource-item">
+            {% if resource.available %}
+            <a href="{{ resource.url }}" download>{{ resource.label }}</a>
+            {% else %}
+            <span>{{ resource.label }} <strong>(currently unavailable)</strong></span>
+            {% endif %}
+            <code>{{ resource.file }}</code>
+            {% if resource.available %}
+            <span class="resource-command"><span>Browser URL:</span> <code>{{ resource.url }}</code></span>
+            <span class="resource-command"><span>VM command:</span> <code>{{ resource.curl_command }}</code></span>
+            {% endif %}
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </details>
     {% endif %}
+    <section class="completion-panel" aria-label="Page completion">
+      <form method="post" action="/course/{{ page.id }}/completion">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <label>
+          <input type="checkbox" name="completed" value="true"{% if page_complete %} checked{% endif %}>
+          Mark this page complete
+        </label>
+        <button class="button" type="submit">Save progress</button>
+      </form>
+      {% if page_complete %}<p class="completion-hint">Uncheck and save to mark this page incomplete.</p>{% else %}<p class="completion-hint">Check and save when you have finished this page.</p>{% endif %}
+      <p class="progress-summary">{{ progress_summary.completed }} of {{ progress_summary.total }} pages complete ({{ progress_summary.percentage }}%).</p>
+    </section>
   </header>
   <div class="markdown-body">{{ page.html | safe }}</div>
 </article>
 
 <nav class="page-navigation" aria-label="Course page navigation">
-  {% if previous_page %}<a class="button secondary" href="/course/{{ previous_page.id }}">← {{ previous_page.title }}</a>{% else %}<span></span>{% endif %}
+  {% if previous_page %}<a class="button secondary" href="/course/{{ previous_page.id }}">← {{ previous_page.title }}</a>{% else %}<a class="button secondary" href="/course">Course index</a>{% endif %}
   {% if next_page %}<a class="button" href="/course/{{ next_page.id }}">{{ next_page.title }} →</a>{% endif %}
 </nav>
 {% endblock %}

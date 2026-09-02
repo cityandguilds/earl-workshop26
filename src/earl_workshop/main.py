@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import secrets
+import shlex
 from collections.abc import Generator
 from dataclasses import replace
-from pathlib import Path
-from urllib.parse import urlsplit
+from mimetypes import guess_type
+from pathlib import Path, PurePosixPath
+from urllib.parse import quote, urlsplit
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Query, Request, status
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
@@ -29,7 +31,15 @@ from .auth import (
 from .config import Settings
 from .course import CoursePage, Workshop, load_workshop
 from .credentials import VMEncryptionError, attendee_connection, validate_vm_encryption_key
-from .db import User, UserRole, create_engine, create_session_factory, initialize_database
+from .db import (
+    User,
+    UserRole,
+    completed_page_ids,
+    create_engine,
+    create_session_factory,
+    initialize_database,
+    set_page_completion,
+)
 
 # The canonical brand entry points are committed local assets. The SVG and PNG both use
 # the supplied City & Guilds lion artwork; no network or runtime asset generation is needed.
@@ -60,6 +70,9 @@ def _template_context(
         "workshop": workshop,
         "version": __version__,
         "current_user": safe_user,
+        "course_index": False,
+        "completed_page_ids": set(),
+        "progress_summary": {"completed": 0, "total": len(workshop.pages), "percentage": 0},
         "csrf_token": csrf_token(request),
         "brand_logo_url": _brand_asset_url(settings.asset_dir, BRAND_LOGO_NAME),
         "favicon_url": _brand_asset_url(settings.asset_dir, BRAND_FAVICON_NAME),
@@ -88,6 +101,62 @@ def _safe_next_path(next_path: str | None) -> str:
     return "/"
 
 
+def _safe_resource_path(
+    resources_dir: Path, resource_path: str, declared_resources: frozenset[str]
+) -> Path | None:
+    """Resolve one declared resource without allowing path escape or symlink escape."""
+
+    if (
+        not resource_path
+        or "\x00" in resource_path
+        or "\\" in resource_path
+        or resource_path.startswith("/")
+        or (len(resource_path) >= 3 and resource_path[1:3] == ":/")
+        or resource_path not in declared_resources
+    ):
+        return None
+    parts = resource_path.split("/")
+    if any(not part or part in {".", ".."} for part in parts):
+        return None
+
+    try:
+        root = resources_dir.resolve()
+        candidate = (root / PurePosixPath(resource_path)).resolve()
+    except (OSError, RuntimeError):
+        return None
+    try:
+        candidate.relative_to(root)
+        available = candidate.is_file()
+    except (OSError, ValueError):
+        return None
+    return candidate if available else None
+
+
+def _resource_url(request: Request, settings: Settings, resource_file: str) -> str:
+    """Build a stable browser URL from the configured public base or request origin."""
+
+    base_url = (settings.public_base_url or str(request.base_url)).rstrip("/")
+    return f"{base_url}/resources/{quote(resource_file, safe='/')}"
+
+
+def _progress_context(db: Session, user: User, workshop: Workshop) -> dict[str, object]:
+    """Return current-content progress only, ignoring records for removed page IDs."""
+
+    page_ids = tuple(page.id for page in workshop.pages)
+    completed_ids = completed_page_ids(db, attendee_id=user.id, page_ids=page_ids)
+    total = len(page_ids)
+    completed = len(completed_ids)
+    percentage = round((completed / total) * 100) if total else 0
+    return {
+        "completed_page_ids": completed_ids,
+        "progress_summary": {
+            "completed": completed,
+            "total": total,
+            "percentage": percentage,
+        },
+    }
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     runtime_settings = settings or Settings.from_env()
     runtime_settings = replace(
@@ -104,6 +173,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         runtime_settings = replace(runtime_settings, session_secret=secrets.token_urlsafe(32))
 
     workshop = load_workshop(runtime_settings.content_dir)
+    declared_resource_files = frozenset(
+        resource.file for page in workshop.pages for resource in page.resources
+    )
     app = FastAPI(title=workshop.title, version=__version__)
     templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
     app.state.settings = runtime_settings
@@ -165,8 +237,23 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return templates.TemplateResponse(request=request, name="attendee.html", context=context)
 
     @app.get("/", response_class=HTMLResponse)
-    async def landing_page(request: Request) -> HTMLResponse:
-        context = _template_context(request, settings=runtime_settings, workshop=workshop)
+    async def landing_page(
+        request: Request, db: Session = Depends(get_db)
+    ) -> HTMLResponse:
+        user = current_user(db, request)
+        context = _template_context(
+            request, settings=runtime_settings, workshop=workshop, user=user
+        )
+        return templates.TemplateResponse(request=request, name="index.html", context=context)
+
+    @app.get("/course", response_class=HTMLResponse)
+    async def course_index(request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
+        user = require_authenticated_user(db, request)
+        context = _template_context(
+            request, settings=runtime_settings, workshop=workshop, user=user
+        )
+        context["course_index"] = True
+        context.update(_progress_context(db, user, workshop))
         return templates.TemplateResponse(request=request, name="index.html", context=context)
 
     @app.get("/login", response_class=HTMLResponse)
@@ -248,16 +335,88 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         user = require_role(db, request, UserRole.ATTENDEE)
         return _attendee_dashboard_response(request, db, user)
 
+    @app.get("/resources/{resource_path:path}", name="public_resource")
+    async def public_resource(resource_path: str) -> FileResponse:
+        """Serve only declared, existing files beneath the configured resource root."""
+
+        candidate = _safe_resource_path(
+            runtime_settings.resources_dir, resource_path, declared_resource_files
+        )
+        if candidate is None:
+            raise HTTPException(status_code=404, detail="Resource not found")
+        return FileResponse(
+            candidate,
+            filename=candidate.name,
+            media_type=guess_type(candidate.name)[0] or "application/octet-stream",
+        )
+
     @app.get("/course/{page_id}", response_class=HTMLResponse)
-    async def course_page(request: Request, page_id: str) -> HTMLResponse:
+    async def course_page(
+        request: Request, page_id: str, db: Session = Depends(get_db)
+    ) -> HTMLResponse:
+        user = require_authenticated_user(db, request)
         page = next((candidate for candidate in workshop.pages if candidate.id == page_id), None)
         if page is None:
             raise HTTPException(status_code=404, detail="Course page not found")
-        context = _template_context(request, settings=runtime_settings, workshop=workshop)
+        context = _template_context(
+            request, settings=runtime_settings, workshop=workshop, user=user
+        )
+        context.update(_progress_context(db, user, workshop))
         context["page"] = page
+        context["page_index"] = workshop.pages.index(page)
+        context["page_complete"] = page.id in context["completed_page_ids"]
+        resource_links = []
+        for resource in page.resources:
+            resource_url = _resource_url(request, runtime_settings, resource.file)
+            resource_links.append(
+                {
+                    "label": resource.label,
+                    "file": resource.file,
+                    "url": resource_url,
+                    "curl_command": f"curl -fL {shlex.quote(resource_url)}",
+                    "available": _safe_resource_path(
+                        runtime_settings.resources_dir,
+                        resource.file,
+                        declared_resource_files,
+                    )
+                    is not None,
+                }
+            )
+        context["resource_links"] = resource_links
         context["previous_page"] = _neighbour(workshop, page, offset=-1)
         context["next_page"] = _neighbour(workshop, page, offset=1)
         return templates.TemplateResponse(request=request, name="course_page.html", context=context)
+
+    @app.post("/course/{page_id}/completion")
+    async def update_course_completion(
+        request: Request,
+        page_id: str,
+        completed: str = Form(default="false"),
+        submitted_csrf_token: str = Form(default="", alias="csrf_token"),
+        db: Session = Depends(get_db),
+    ) -> RedirectResponse:
+        user = require_authenticated_user(db, request)
+        validate_csrf(request, submitted_csrf_token)
+        page = next((candidate for candidate in workshop.pages if candidate.id == page_id), None)
+        if page is None:
+            raise HTTPException(status_code=404, detail="Course page not found")
+
+        normalized_completed = completed.strip().casefold()
+        if normalized_completed in {"1", "true", "on", "yes"}:
+            is_completed = True
+        elif normalized_completed in {"0", "false", "off", "no", ""}:
+            is_completed = False
+        else:
+            raise HTTPException(status_code=400, detail="Invalid completion state")
+        set_page_completion(
+            db,
+            attendee_id=user.id,
+            page_id=page.id,
+            completed=is_completed,
+        )
+        return RedirectResponse(
+            url=f"/course/{page.id}", status_code=status.HTTP_303_SEE_OTHER
+        )
 
     return app
 

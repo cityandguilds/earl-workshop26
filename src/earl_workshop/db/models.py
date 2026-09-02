@@ -14,6 +14,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
     func,
     text,
 )
@@ -55,6 +56,34 @@ class User(Base):
     vm_assignments: Mapped[list[VMAssignment]] = relationship(
         "VMAssignment", back_populates="attendee"
     )
+    course_progress: Mapped[list[CourseProgress]] = relationship(
+        "CourseProgress", back_populates="attendee"
+    )
+
+
+class CourseProgress(Base):
+    """An attendee's completion state for one stable Markdown page ID."""
+
+    __tablename__ = "course_progress"
+    __table_args__ = (
+        UniqueConstraint(
+            "attendee_id", "page_id", name="uq_course_progress_attendee_page"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    attendee_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    page_id: Mapped[str] = mapped_column(String(150), nullable=False)
+    completed: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("0")
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+    attendee: Mapped[User] = relationship("User", back_populates="course_progress")
 
 
 class VMCredential(Base):

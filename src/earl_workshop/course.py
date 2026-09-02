@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from pathlib import Path
+from posixpath import normpath
 from typing import Any
 
 import markdown
@@ -35,10 +36,38 @@ class CoursePage:
 
 
 @dataclass(frozen=True, slots=True)
+class CourseSection:
+    """A navigation section derived from page front matter."""
+
+    name: str
+    order: int
+    pages: tuple[CoursePage, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class Workshop:
     title: str
     subtitle: str
     pages: tuple[CoursePage, ...]
+
+    @property
+    def sections(self) -> tuple[CourseSection, ...]:
+        """Group the already-ordered pages without hard-coding course sections."""
+
+        grouped: dict[tuple[int, str], list[CoursePage]] = {}
+        section_names: dict[tuple[int, str], str] = {}
+        for page in self.pages:
+            key = (page.section_order, page.section.casefold())
+            grouped.setdefault(key, []).append(page)
+            section_names.setdefault(key, page.section)
+        return tuple(
+            CourseSection(
+                name=section_names[key],
+                order=key[0],
+                pages=tuple(grouped[key]),
+            )
+            for key in sorted(grouped)
+        )
 
 
 _FENCE_PATTERN = r"^ {0,3}(`{3,}|~{3,})[^\n]*\n.*?^ {0,3}\1\s*$"
@@ -162,8 +191,19 @@ def _resource_declarations(metadata: dict[str, Any], path: Path) -> tuple[Resour
                 f"Course page {path} resource #{index} requires a non-empty string 'file' field"
             )
         normalized = resource_file.strip().replace("\\", "/")
-        resource_path = Path(normalized)
-        if resource_path.is_absolute() or ".." in resource_path.parts:
+        parts = normalized.split("/")
+        if (
+            not normalized
+            or "\x00" in normalized
+            or normalized.startswith("/")
+            or (len(normalized) >= 3 and normalized[1:3] == ":/")
+            or ".." in parts
+        ):
+            raise CourseContentError(
+                f"Course page {path} resource #{index} has unsafe file path {resource_file!r}"
+            )
+        normalized = normpath(normalized)
+        if normalized in {"", ".", ".."} or normalized.startswith("../"):
             raise CourseContentError(
                 f"Course page {path} resource #{index} has unsafe file path {resource_file!r}"
             )
@@ -238,5 +278,12 @@ def load_workshop(content_dir: Path | str) -> Workshop:
         seen_ids[page.id] = page.source_path
         pages.append(page)
 
-    pages.sort(key=lambda page: (page.section_order, page.order, page.section.casefold(), page.id))
+    pages.sort(
+        key=lambda page: (
+            page.section_order,
+            page.section.casefold(),
+            page.order,
+            page.id,
+        )
+    )
     return Workshop(title=title.strip(), subtitle=subtitle.strip(), pages=tuple(pages))

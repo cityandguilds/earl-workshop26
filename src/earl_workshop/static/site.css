@@ -40,6 +40,8 @@ a { color: inherit; }
 
 .header-user { color: #D9DDDF; font-size: 0.85rem; }
 
+.header-link { color: var(--white); font-size: 0.85rem; font-weight: 700; }
+
 .link-button { border: 0; cursor: pointer; font: inherit; }
 
 .hero { display: grid; grid-template-columns: minmax(0, 1fr) 15rem; align-items: center; gap: 4rem; padding: 5.5rem 0 4.5rem; }
@@ -68,17 +70,35 @@ h2 { margin: 0; font-size: clamp(1.8rem, 3vw, 2.7rem); }
 
 .section-summary { max-width: 22rem; margin: 0; color: var(--muted); font-size: 0.95rem; }
 
+.section-summary p { margin: 0; }
+
+.progress-summary { color: var(--muted); font-size: 0.9rem; }
+
+.progress-summary strong { color: var(--ink); }
+
 .page-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
+
+.course-section { margin-top: 2rem; }
+
+.course-section-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; margin-bottom: 0.8rem; }
+
+.course-section-heading h3 { margin: 0; font-size: 1.25rem; }
+
+.course-section-heading span { color: var(--muted); font-size: 0.85rem; }
 
 .page-card { display: flex; align-items: center; gap: 0.9rem; min-height: 9rem; padding: 1.25rem; background: var(--white); border: 1px solid var(--line); text-decoration: none; transition: border-color 120ms ease, transform 120ms ease; }
 
 .page-card:hover, .page-card:focus-visible { border-color: var(--red); transform: translateY(-0.15rem); }
+
+.page-card.is-complete { border-left: 0.3rem solid #0B6B3A; }
 
 .page-number { color: var(--red); font-size: 1.4rem; font-weight: 800; align-self: start; }
 
 .page-card-copy { display: grid; gap: 0.35rem; flex: 1; }
 
 .page-section { color: var(--muted); font-size: 0.74rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+
+.page-complete { color: #0B6B3A; font-size: 0.8rem; font-weight: 700; }
 
 .arrow { color: var(--red); font-size: 1.4rem; }
 
@@ -100,13 +120,37 @@ code { padding: 0.1rem 0.3rem; color: var(--ink); background: #E9ECEC; border-ra
 
 .article-header h1 { font-size: clamp(2.4rem, 5vw, 4.3rem); }
 
-.resources-panel { margin-top: 1.8rem; padding: 1rem 1.2rem; background: var(--white); border: 1px solid var(--line); }
+.resources-menu { margin-top: 1.8rem; background: var(--white); border: 1px solid var(--line); }
+
+.resources-menu summary { padding: 0.9rem 1.2rem; color: var(--ink); cursor: pointer; font-weight: 700; }
+
+.resources-panel { padding: 0 1.2rem 1rem; }
+
+.resource-intro { margin: 0 0 0.7rem; color: var(--muted); font-size: 0.9rem; }
 
 .resources-panel ul { margin: 0.45rem 0 0; padding-left: 1.2rem; }
 
-.resources-panel li { margin-top: 0.3rem; }
+.resources-panel li { margin-top: 0.8rem; }
+
+.resource-item { display: grid; gap: 0.25rem; }
 
 .resources-panel code { margin-left: 0.35rem; color: var(--muted); }
+
+.resource-command { color: var(--muted); font-size: 0.82rem; overflow-wrap: anywhere; }
+
+.resource-command code { color: var(--ink); }
+
+.completion-panel { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-top: 1.5rem; padding: 1rem 1.2rem; background: #F1E5E7; border-left: 0.3rem solid var(--red); }
+
+.completion-panel form { display: flex; align-items: center; flex-wrap: wrap; gap: 0.9rem; }
+
+.completion-panel label { font-weight: 700; }
+
+.completion-panel input { width: 1.1rem; height: 1.1rem; margin-right: 0.35rem; vertical-align: -0.15rem; accent-color: var(--red); }
+
+.completion-hint { margin: 0; color: var(--muted); font-size: 0.82rem; }
+
+.completion-panel .progress-summary { margin: 0; text-align: right; }
 
 .markdown-body { padding-top: 2.2rem; font-size: 1.08rem; }
 
@@ -212,6 +256,8 @@ code { padding: 0.1rem 0.3rem; color: var(--ink); background: #E9ECEC; border-ra
   .page-navigation { align-items: stretch; flex-direction: column; }
   .dashboard { margin-top: 2.5rem; }
   .connection-card { padding: 1.1rem; }
+  .completion-panel { align-items: start; flex-direction: column; }
+  .completion-panel .progress-summary { text-align: left; }
   .credential-row { grid-template-columns: 1fr; gap: 0.45rem; }
   .credential-row dd { align-items: start; flex-direction: column; gap: 0.65rem; }
   .ssh-example .copy-button { display: block; margin: 0.9rem 0 0; }

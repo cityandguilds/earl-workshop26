@@ -3,7 +3,9 @@ from pathlib import Path
 from cryptography.fernet import Fernet
 from fastapi.testclient import TestClient
 
+from earl_workshop.auth import create_user
 from earl_workshop.config import Settings
+from earl_workshop.db import UserRole
 from earl_workshop.main import create_app
 
 TEST_VM_ENCRYPTION_KEY = Fernet.generate_key().decode()
@@ -72,6 +74,27 @@ def test_course_page_is_rendered_from_loaded_content(tmp_path: Path) -> None:
         vm_encryption_key=TEST_VM_ENCRYPTION_KEY,
     )
     client = TestClient(create_app(settings))
+
+    assert client.get("/course/runtime").status_code == 401
+    with client.app.state.session_factory() as session:
+        create_user(
+            session,
+            username="attendee",
+            password="attendee password",
+            role=UserRole.ATTENDEE,
+        )
+    login_page = client.get("/login")
+    csrf_token = login_page.text.split('name="csrf_token" value="', 1)[1].split('"', 1)[0]
+    login = client.post(
+        "/login",
+        data={
+            "username": "attendee",
+            "password": "attendee password",
+            "csrf_token": csrf_token,
+        },
+        follow_redirects=False,
+    )
+    assert login.status_code == 303
 
     response = client.get("/course/runtime")
 

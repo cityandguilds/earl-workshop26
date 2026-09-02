@@ -20,6 +20,7 @@
         <span class="header-kicker">Development to Deployment</span>
         <div class="header-account">
           {% if current_user %}
+          <a class="header-link" href="/course">Course</a>
           <span class="header-user">{{ current_user.username }}</span>
           <form method="post" action="/logout">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">

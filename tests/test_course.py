@@ -38,6 +38,10 @@ def test_placeholder_pages_load_in_deterministic_order() -> None:
         "runtime",
         "next-steps",
     ]
+    assert [section.name for section in workshop.sections] == [
+        "Getting started",
+        "Working habits",
+    ]
     assert workshop.pages[0].resources[0].file == "examples/hello.txt"
     assert "<h2>A useful first check</h2>" in workshop.pages[0].html
 

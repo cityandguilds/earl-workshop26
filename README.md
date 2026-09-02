@@ -21,7 +21,9 @@ The installed console entry point is also available:
 uv run earl-workshop serve
 ```
 
-The portal includes application-managed user persistence, portal authentication, and an attendee VM-credentials dashboard. VM passwords are encrypted at rest with a dedicated Fernet key; administrator assignment forms are intentionally deferred.
+The portal includes application-managed user persistence, portal authentication, an authenticated
+Markdown course experience, and an attendee VM-credentials dashboard. VM passwords are encrypted
+at rest with a dedicated Fernet key; administrator assignment forms are intentionally deferred.
 
 ## Repository layout
 
@@ -45,7 +47,7 @@ title: Development to Deployment
 subtitle: Infrastructure for Data Teams
 ```
 
-Each `content/pages/*.md` file begins with a small YAML front matter block:
+Each `content/pages/*.md` file begins with a YAML front matter block followed by Markdown:
 
 ```yaml
 ---
@@ -60,11 +62,59 @@ resources:
 ---
 ```
 
-`id`, `title`, and `order` are required. IDs must be unique stable URL-safe identifiers using letters, numbers, `-`, or `_`; progress in a later slice will be able to refer to them independently of filenames and titles. `section` defaults to `Workshop`, `section_order` defaults to `0`, and `resources` defaults to an empty list. Resource paths must be relative and cannot contain `..` segments.
+The authoring contract is:
 
-Pages are ordered deterministically by `section_order`, `order`, section name, and stable page ID. Duplicate IDs, malformed YAML, missing required fields, invalid integer fields, and unsafe resource declarations produce actionable startup validation errors. Markdown supports fenced code and tables; raw HTML is escaped rather than rendered as trusted page markup.
+- `id`, `title`, and `order` are required. `id` is the stable page ID: choose a unique,
+  URL-safe value using letters, numbers, `-`, or `_`, and keep it unchanged when renaming a
+  file or revising its title. Attendee completion is keyed by this value.
+- `section` defaults to `Workshop`; `section_order` defaults to `0`. Sections are shown in
+  ascending `section_order`, then case-insensitive section-name order. Pages within a section
+  are shown in ascending `order`, then stable page ID. This makes navigation deterministic and
+  entirely data-driven.
+- `resources` defaults to an empty list. Each item must contain a relative `file` path and may
+  contain a non-empty `label`. Paths are normalized to `/`, cannot be absolute, and cannot
+  contain `..` segments. A resource is visible on a page only when that page declares it.
+- The body is rendered as Markdown with fenced-code and table support. Raw HTML is escaped.
 
-Resources in this slice are only stored and declared as content foundations. Resource download routes are reserved for a later slice.
+Changing front matter or adding/removing Markdown files changes the current course sequence when
+the application restarts; no Python route edits are required.
+
+Pages are ordered deterministically by `section_order`, section name, `order`, and stable page ID. Duplicate IDs, malformed YAML, missing required fields, invalid integer fields, and unsafe resource declarations produce actionable startup validation errors. Markdown supports fenced code and tables; raw HTML is escaped rather than rendered as trusted page markup.
+
+## Course access, resources, and progress
+
+Sign in and open `/course` for the authenticated course index. Course pages at
+`/course/<stable-page-id>` require an active portal session. They show previous/next links across
+the current deterministic page sequence, a page-specific resources menu, and the current
+attendee's completion summary.
+
+Declared resource files are intentionally public workshop teaching material. A declared file is
+available at a stable URL such as:
+
+```text
+http://127.0.0.1:8000/resources/examples/hello.txt
+```
+
+The page menu also provides a VM-friendly command, for example:
+
+```bash
+curl -fL http://127.0.0.1:8000/resources/examples/hello.txt
+```
+
+The public route serves only existing files declared by current Markdown pages, after normalized
+path and resolved-root checks. Absolute paths, traversal (including encoded traversal), symlinks
+outside the resources root, undeclared files, and missing files return a safe not-found response.
+This route is deliberately unauthenticated for attendee VMs; course HTML remains authenticated.
+Set `EARL_WORKSHOP_PUBLIC_BASE_URL` when a reverse proxy or public domain should be used in the
+browser and curl commands. Otherwise the current request origin is used.
+
+The completion checkbox uses an authenticated POST protected by the same session-bound CSRF token
+as the other state-changing forms. Saving a checked box marks the stable page ID complete;
+unchecking and saving marks it incomplete. One unique record per attendee/page is retained in
+SQLite, so state survives logout, application restart, and content filename/title changes.
+Progress percentages count only current page IDs, so records for pages removed from the course are
+ignored rather than breaking the current summary. Resource files must contain no passwords,
+credentials, private keys, database files, configuration secrets, or other sensitive material.
 
 ## Configuration and packaging
 
@@ -117,4 +167,7 @@ The wheel includes the package templates/CSS plus the current placeholder conten
 
 ## Deferred infrastructure
 
-This v0.1.0 increment intentionally does not implement administrator forms for creating or assigning VM records, VM provisioning, SSH connectivity checks, VM health monitoring, progress tracking, resource download routes, DigitalOcean/Terraform provisioning, production bootstrap automation, final curriculum, domain/TLS automation, or conference deployment. VM provisioning is not part of v0.1.0. It also does not require Node.js.
+This v0.1.0 increment intentionally does not implement administrator forms for creating or assigning
+VM records, VM provisioning, SSH connectivity checks, VM health monitoring, DigitalOcean/Terraform
+provisioning, production bootstrap automation, final curriculum, domain/TLS automation, or
+conference deployment. VM provisioning is not part of v0.1.0. It also does not require Node.js.
