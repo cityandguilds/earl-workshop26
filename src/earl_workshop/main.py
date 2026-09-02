@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -13,14 +13,16 @@ from . import __version__
 from .config import Settings
 from .course import CoursePage, Workshop, load_workshop
 
-# The checkout contains one supplied visual asset. It is intentionally shared by the
-# header logo, hero mark, and favicon rather than replaced with an unapproved asset.
+# The checkout contains one supplied visual asset. The canonical logo and favicon paths
+# are aliases to that same file, rather than generated or downloaded replacement artwork.
 BRAND_IMAGE_NAME = "cg-lion-news-cover-lion-jpg.jpg"
+BRAND_LOGO_NAME = "logo.svg"
+BRAND_FAVICON_NAME = "favicon.png"
 
 
-def _brand_image_url(asset_dir: Path) -> str:
-    if (asset_dir / BRAND_IMAGE_NAME).is_file():
-        return f"/assets/{BRAND_IMAGE_NAME}"
+def _brand_asset_url(asset_dir: Path, name: str) -> str:
+    if (asset_dir / name).is_file():
+        return f"/assets/{name}"
     return ""
 
 
@@ -32,7 +34,8 @@ def _template_context(
         "settings": settings,
         "workshop": workshop,
         "version": __version__,
-        "brand_image_url": _brand_image_url(settings.asset_dir),
+        "brand_logo_url": _brand_asset_url(settings.asset_dir, BRAND_LOGO_NAME),
+        "favicon_url": _brand_asset_url(settings.asset_dir, BRAND_FAVICON_NAME),
     }
 
 
@@ -46,6 +49,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     static_dir = Path(__file__).parent / "static"
     app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
+    @app.get(f"/assets/{BRAND_LOGO_NAME}", include_in_schema=False)
+    async def brand_logo() -> FileResponse:
+        return FileResponse(runtime_settings.asset_dir / BRAND_LOGO_NAME, media_type="image/jpeg")
+
+    @app.get(f"/assets/{BRAND_FAVICON_NAME}", include_in_schema=False)
+    async def brand_favicon() -> FileResponse:
+        return FileResponse(
+            runtime_settings.asset_dir / BRAND_FAVICON_NAME, media_type="image/jpeg"
+        )
+
     app.mount("/assets", StaticFiles(directory=runtime_settings.asset_dir), name="assets")
 
     @app.get("/healthz")

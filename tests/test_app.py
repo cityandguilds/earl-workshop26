@@ -33,13 +33,18 @@ def test_health_and_branded_landing_page() -> None:
     assert "Development to Deployment" in landing.text
     assert "Infrastructure for Data Teams" in landing.text
     assert "/static/site.css" in landing.text
-    brand_asset_url = "/assets/cg-lion-news-cover-lion-jpg.jpg"
-    assert f'<link rel="icon" href="{brand_asset_url}" type="image/jpeg">' in landing.text
-    assert landing.text.count(f'src="{brand_asset_url}"') == 2
+    logo_url = "/assets/logo.svg"
+    favicon_url = "/assets/favicon.png"
+    assert f'<link rel="icon" href="{favicon_url}" type="image/jpeg">' in landing.text
+    assert landing.text.count(f'src="{logo_url}"') == 2
 
-    asset = client.get(brand_asset_url)
-    assert asset.status_code == 200
-    assert asset.headers["content-type"].startswith("image/jpeg")
+    logo = client.get(logo_url)
+    favicon = client.get(favicon_url)
+    assert logo.status_code == 200
+    assert favicon.status_code == 200
+    assert logo.headers["content-type"].startswith("image/jpeg")
+    assert favicon.headers["content-type"].startswith("image/jpeg")
+    assert logo.content == favicon.content
 
 
 def test_course_page_is_rendered_from_loaded_content() -> None:
