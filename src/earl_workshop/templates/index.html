@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="hero" aria-labelledby="page-title">
+  <div class="hero-copy">
+    <p class="eyebrow">EARL 2026 · technical workshop</p>
+    <h1 id="page-title">{{ workshop.title }}</h1>
+    <p class="lede">{{ workshop.subtitle }}</p>
+    <p class="hero-note">A small, practical foundation for exploring infrastructure workflows with data teams. The pages here are representative placeholders while the workshop content is being authored.</p>
+  </div>
+  {% if brand_logo_url %}
+  <div class="hero-art" aria-hidden="true">
+    <img src="{{ brand_logo_url }}" alt="">
+  </div>
+  {% endif %}
+</section>
+
+<section class="course-overview" aria-labelledby="course-heading">
+  <div class="section-heading">
+    <div>
+      <p class="eyebrow">Workshop route</p>
+      <h2 id="course-heading">Start with the foundations</h2>
+    </div>
+    <p class="section-summary">Course pages are Markdown files, ordered and grouped by their front matter.</p>
+  </div>
+  <div class="page-list">
+    {% for page in workshop.pages %}
+    <a class="page-card" href="/course/{{ page.id }}">
+      <span class="page-number">{{ "%02d" | format(loop.index) }}</span>
+      <span class="page-card-copy">
+        <span class="page-section">{{ page.section }}</span>
+        <strong>{{ page.title }}</strong>
+      </span>
+      <span class="arrow" aria-hidden="true">→</span>
+    </a>
+    {% else %}
+    <p>No workshop pages have been authored yet.</p>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="callout" aria-label="Content authoring note">
+  <span class="callout-mark">i</span>
+  <p>Workshop authors can add, remove, reorder, or rewrite pages in <code>content/pages/</code> without changing application routes.</p>
+</section>
+{% endblock %}

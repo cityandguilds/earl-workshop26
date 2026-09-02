@@ -1,0 +1,3 @@
+EARL 2026 workshop example resource
+
+This harmless placeholder demonstrates the repository location for page-specific resources.

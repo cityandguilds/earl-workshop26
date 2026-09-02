@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="{{ workshop.subtitle }}">
+    <title>{% block title %}{{ workshop.title }}{% endblock %}</title>
+    {% if favicon_url %}<link rel="icon" href="{{ favicon_url }}">{% endif %}
+    <link rel="stylesheet" href="/static/site.css">
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="shell header-inner">
+        <a class="brand" href="/" aria-label="{{ workshop.title }} home">
+          {% if brand_logo_url %}
+            <img src="{{ brand_logo_url }}" alt="City &amp; Guilds" class="brand-mark">
+          {% endif %}
+          <span class="brand-name">EARL <span>2026</span></span>
+        </a>
+        <span class="header-kicker">Development to Deployment</span>
+      </div>
+    </header>
+    <main class="shell">
+      {% block content %}{% endblock %}
+    </main>
+    <footer class="site-footer">
+      <div class="shell footer-inner">
+        <span>City &amp; Guilds · EARL 2026 workshop</span>
+        <span>Portal v{{ version }}</span>
+      </div>
+    </footer>
+  </body>
+</html>

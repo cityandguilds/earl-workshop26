@@ -1,10 +1,25 @@
-# Python-generated files
+# Local environments and packaging output
+.venv/
 __pycache__/
-*.py[oc]
-build/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
 dist/
-wheels/
-*.egg-info
+build/
 
-# Virtual environments
-.venv
+# Runtime configuration and state
+.env
+.env.*
+!.env.example
+.data/
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# Local editor and OS files
+.DS_Store
+.idea/
+.vscode/
