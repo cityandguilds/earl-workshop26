@@ -13,14 +13,14 @@ from . import __version__
 from .config import Settings
 from .course import CoursePage, Workshop, load_workshop
 
+# The checkout contains one supplied visual asset. It is intentionally shared by the
+# header logo, hero mark, and favicon rather than replaced with an unapproved asset.
+BRAND_IMAGE_NAME = "cg-lion-news-cover-lion-jpg.jpg"
 
-def _asset_url(asset_dir: Path, name: str) -> str:
-    requested = asset_dir / name
-    if requested.is_file():
-        return f"/assets/{name}"
-    fallback = asset_dir / "cg-lion-news-cover-lion-jpg.jpg"
-    if fallback.is_file():
-        return f"/assets/{fallback.name}"
+
+def _brand_image_url(asset_dir: Path) -> str:
+    if (asset_dir / BRAND_IMAGE_NAME).is_file():
+        return f"/assets/{BRAND_IMAGE_NAME}"
     return ""
 
 
@@ -32,8 +32,7 @@ def _template_context(
         "settings": settings,
         "workshop": workshop,
         "version": __version__,
-        "brand_logo_url": _asset_url(settings.asset_dir, "logo.svg"),
-        "favicon_url": _asset_url(settings.asset_dir, "favicon.png"),
+        "brand_image_url": _brand_image_url(settings.asset_dir),
     }
 
 

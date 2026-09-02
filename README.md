@@ -34,9 +34,7 @@ src/earl_workshop/      FastAPI app, loader, templates, and CSS
 tests/                  content and application foundation tests
 ```
 
-The supplied files under `assets/` are the branding authority. `assets/brand.md` currently approves `#E31837` as the primary colour and `#1D252D` as the secondary colour; the CSS uses those values and a system sans-serif fallback. No external fonts, logos, CDN, or JavaScript framework is required.
-
-The frozen implementation plan names `assets/logo.svg` and `assets/favicon.png`, but those two files are not present in this checkout. The application only uses the existing supplied lion image as a local fallback until the named supplied files are restored; it does not generate or download substitute branding.
+The supplied files under `assets/` are the branding authority. `assets/brand.md` currently approves `#E31837` as the primary colour and `#1D252D` as the secondary colour; the CSS uses those values and a system sans-serif fallback. The supplied `assets/cg-lion-news-cover-lion-jpg.jpg` is used for both the site logo and favicon. No external fonts, logos, CDN, or JavaScript framework is required.
 
 ## Authoring course content
 

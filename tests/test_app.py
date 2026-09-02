@@ -33,7 +33,13 @@ def test_health_and_branded_landing_page() -> None:
     assert "Development to Deployment" in landing.text
     assert "Infrastructure for Data Teams" in landing.text
     assert "/static/site.css" in landing.text
-    assert "/assets/cg-lion-news-cover-lion-jpg.jpg" in landing.text
+    brand_asset_url = "/assets/cg-lion-news-cover-lion-jpg.jpg"
+    assert f'<link rel="icon" href="{brand_asset_url}" type="image/jpeg">' in landing.text
+    assert landing.text.count(f'src="{brand_asset_url}"') == 2
+
+    asset = client.get(brand_asset_url)
+    assert asset.status_code == 200
+    assert asset.headers["content-type"].startswith("image/jpeg")
 
 
 def test_course_page_is_rendered_from_loaded_content() -> None:
