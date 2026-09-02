@@ -9,7 +9,7 @@ The current course prose is deliberately representative placeholder material. Au
 The project requires Python 3.13 and [uv](https://docs.astral.sh/uv/).
 
 ```bash
-uv sync --extra dev
+uv sync
 uv run uvicorn earl_workshop.main:app --host 127.0.0.1 --port 8000
 ```
 
