@@ -17,8 +17,8 @@
           {% endif %}
           <span class="brand-name">EARL <span>2026</span></span>
         </a>
-        <span class="header-kicker">Development to Deployment</span>
         <div class="header-account">
+          <a class="header-link" href="/learn-more">Learn more</a>
           {% if current_user %}
           <a class="header-link" href="/course">Course</a>
           {% if current_user.role == 'admin' %}<a class="header-link" href="/admin">Admin</a>{% endif %}
@@ -38,8 +38,7 @@
     </main>
     <footer class="site-footer">
       <div class="shell footer-inner">
-        <span>City &amp; Guilds · EARL 2026 workshop</span>
-        <span>Portal v{{ version }}</span>
+        <span>City &amp; Guilds · EARL 2026</span>
       </div>
     </footer>
   </body>

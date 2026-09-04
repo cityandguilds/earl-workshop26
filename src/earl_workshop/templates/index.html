@@ -3,10 +3,8 @@
 {% block content %}
 <section class="hero" aria-labelledby="page-title">
   <div class="hero-copy">
-    <p class="eyebrow">EARL 2026 · technical workshop</p>
     <h1 id="page-title">{{ workshop.title }}</h1>
     <p class="lede">{{ workshop.subtitle }}</p>
-    <p class="hero-note">A small, practical foundation for exploring infrastructure workflows with data teams. The pages here are representative placeholders while the workshop content is being authored.</p>
   </div>
   {% if brand_logo_url %}
   <div class="hero-art" aria-hidden="true">
@@ -18,18 +16,14 @@
 <section class="course-overview" aria-labelledby="course-heading">
   <div class="section-heading">
     <div>
-      <p class="eyebrow">{% if course_index %}Course index{% else %}Workshop route{% endif %}</p>
-      <h2 id="course-heading">{% if course_index %}Your workshop route{% else %}Start with the foundations{% endif %}</h2>
+      <h2 id="course-heading">Course</h2>
     </div>
-    <div class="section-summary">
-      <p>Course pages are Markdown files, ordered and grouped by their front matter.</p>
       {% if current_user %}
       <p class="progress-summary" aria-label="Course progress">
         <strong>{{ progress_summary.completed }} / {{ progress_summary.total }}</strong> pages complete
         ({{ progress_summary.percentage }}%)
       </p>
       {% endif %}
-    </div>
   </div>
   {% for section in workshop.sections %}
   <section class="course-section" aria-labelledby="section-{{ loop.index }}">
@@ -56,8 +50,4 @@
   {% endfor %}
 </section>
 
-<section class="callout" aria-label="Content authoring note">
-  <span class="callout-mark">i</span>
-  <p>Workshop authors can add, remove, reorder, or rewrite pages in <code>content/pages/</code> without changing application routes.</p>
-</section>
 {% endblock %}

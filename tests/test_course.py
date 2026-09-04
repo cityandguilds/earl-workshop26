@@ -30,20 +30,34 @@ Body for {page_id}.
 """
 
 
-def test_placeholder_pages_load_in_deterministic_order() -> None:
+def test_course_skeleton_loads_in_deterministic_order() -> None:
     workshop = load_workshop(Path("content"))
 
     assert [course_page.id for course_page in workshop.pages] == [
         "orientation",
+        "access-workshop-vm",
+        "bash-primer",
+        "install-software",
         "runtime",
+        "containers",
+        "postgresql",
+        "deployment-options",
+        "prepare-for-deployment",
+        "serve-shiny-app",
+        "serve-quarto-document",
+        "serve-fastapi-app",
         "next-steps",
     ]
     assert [section.name for section in workshop.sections] == [
         "Getting started",
-        "Working habits",
+        "Application setup",
+        "Data services",
+        "Deployment choices",
+        "Serving applications",
+        "Operations and next steps",
     ]
     assert workshop.pages[0].resources[0].file == "examples/hello.txt"
-    assert "<h2>A useful first check</h2>" in workshop.pages[0].html
+    assert "<h2>To be authored</h2>" in workshop.pages[0].html
 
 
 def test_duplicate_stable_ids_fail_with_both_paths(tmp_path: Path) -> None:

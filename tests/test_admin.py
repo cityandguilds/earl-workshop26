@@ -128,9 +128,7 @@ def test_admin_account_lifecycle_and_csrf_are_browser_protected(tmp_path: Path) 
     with app.state.session_factory() as session:
         assert authenticate_user(session, username="new-user", password="new-password") is None
         assert (
-            authenticate_user(
-                session, username="new-user", password="replacement-password"
-            )
+            authenticate_user(session, username="new-user", password="replacement-password")
             is not None
         )
 
@@ -273,8 +271,9 @@ def test_admin_can_create_replace_assign_reassign_and_unassign_encrypted_vm(tmp_
     alice_client = TestClient(app, follow_redirects=False)
     login(alice_client, "alice", "alice-password")
     dashboard = alice_client.get("/attendee")
-    assert "198.51.100.40" in dashboard.text
-    assert "initial-vm-password" in dashboard.text
+    assert "View VM credentials" in dashboard.text
+    assert "198.51.100.40" not in dashboard.text
+    assert "initial-vm-password" not in dashboard.text
 
     update_vm = admin_client.post(
         f"/admin/vms/{vm_id}/edit",
@@ -309,12 +308,13 @@ def test_admin_can_create_replace_assign_reassign_and_unassign_encrypted_vm(tmp_
         assert len(active) == 1
         assert active[0].attendee_id == bob_id
 
-    assert "Your VM is not assigned yet" in alice_client.get("/attendee").text
+    assert "No VM assigned" in alice_client.get("/attendee").text
     bob_client = TestClient(app, follow_redirects=False)
     login(bob_client, "bob", "bob-password")
     bob_dashboard = bob_client.get("/attendee")
-    assert "vm.example.test" in bob_dashboard.text
-    assert "replacement-vm-password" in bob_dashboard.text
+    assert "View VM credentials" in bob_dashboard.text
+    assert "vm.example.test" not in bob_dashboard.text
+    assert "replacement-vm-password" not in bob_dashboard.text
 
     unassign = admin_client.post(
         f"/admin/vms/{vm_id}/assignment",
@@ -322,7 +322,7 @@ def test_admin_can_create_replace_assign_reassign_and_unassign_encrypted_vm(tmp_
         follow_redirects=False,
     )
     assert unassign.status_code == 303
-    assert "Your VM is not assigned yet" in bob_client.get("/attendee").text
+    assert "No VM assigned" in bob_client.get("/attendee").text
     assert "Unassigned" in admin_client.get("/admin").text
 
 

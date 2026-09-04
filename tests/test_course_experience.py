@@ -67,17 +67,17 @@ def test_authenticated_course_index_groups_pages_and_shows_progress(tmp_path: Pa
 
     index = client.get("/course")
     assert index.status_code == 200
-    assert "Your workshop route" in index.text
-    assert "0 / 3" in index.text
-    assert index.text.index("Getting started") < index.text.index("Working habits")
-    assert index.text.index("Find your way around") < index.text.index(
-        "Describe a runnable environment"
-    )
+    assert '<h2 id="course-heading">Course</h2>' in index.text
+    assert "0 / 13" in index.text
+    assert index.text.index("Getting started") < index.text.index("Application setup")
+    assert index.text.index("Bash primer") < index.text.index("Set up the application runtime")
+    for page in load_workshop(Path("content")).pages:
+        assert f'href="/course/{page.id}"' in index.text
 
     first_page = client.get("/course/orientation")
     assert first_page.status_code == 200
-    assert "This short page is a placeholder" in first_page.text
-    assert 'href="/course/runtime"' in first_page.text
+    assert "This page introduces the workshop" in first_page.text
+    assert 'href="/course/access-workshop-vm"' in first_page.text
     assert 'href="/course"' in first_page.text
     assert 'action="/course/orientation/completion"' in first_page.text
 
@@ -139,30 +139,30 @@ def test_progress_is_isolated_persistent_uncomplete_and_stale_safe(tmp_path: Pat
         data={"csrf_token": csrf_from(page), "completed": "true"},
     )
     assert response.status_code == 303
-    assert "1 of 3 pages complete" in client_a.get("/course/orientation").text
+    assert "1 of 13 pages complete" in client_a.get("/course/orientation").text
 
     client_b = TestClient(app, follow_redirects=False)
     login(client_b, "attendee-b", "password-b")
-    assert "0 of 3 pages complete" in client_b.get("/course/orientation").text
+    assert "0 of 13 pages complete" in client_b.get("/course/orientation").text
 
     invalid = client_a.post(
         "/course/orientation/completion",
         data={"csrf_token": "invalid", "completed": "false"},
     )
     assert invalid.status_code == 400
-    assert "1 of 3 pages complete" in client_a.get("/course/orientation").text
+    assert "1 of 13 pages complete" in client_a.get("/course/orientation").text
 
     uncomplete = client_a.post(
         "/course/orientation/completion",
         data={"csrf_token": csrf_from(client_a.get("/course/orientation")), "completed": "false"},
     )
     assert uncomplete.status_code == 303
-    assert "<strong>0 / 3</strong> pages complete" in client_a.get("/course").text
+    assert "<strong>0 / 13</strong> pages complete" in client_a.get("/course").text
 
     restarted = create_app(settings)
     restarted_client = TestClient(restarted, follow_redirects=False)
     login(restarted_client, "attendee-a", "password-a")
-    assert "<strong>0 / 3</strong> pages complete" in restarted_client.get("/course").text
+    assert "<strong>0 / 13</strong> pages complete" in restarted_client.get("/course").text
     with restarted.state.session_factory() as session:
         records = session.scalars(
             select(CourseProgress).where(CourseProgress.attendee_id == attendee_a.id)

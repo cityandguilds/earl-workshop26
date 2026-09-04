@@ -1,8 +1,8 @@
 # EARL 2026 Workshop Portal
 
-This repository contains the runnable v0.1.0 foundation for the City & Guilds EARL 2026 workshop, “Development to Deployment: Infrastructure for Data Teams”. It is a small FastAPI application with server-rendered HTML, local CSS, and filesystem-driven placeholder course content.
+This repository contains the runnable v0.2.0 foundation for the City & Guilds EARL 2026 workshop, “Development to Deployment: Infrastructure for Data Teams”. It is a small FastAPI application with server-rendered HTML, local CSS, and filesystem-driven course-page skeletons.
 
-The current course prose is deliberately representative placeholder material. Authors can substantially revise it without changing Python route code.
+The course skeleton covers Ubuntu VM context, a Bash primer, application and system dependencies, containers, PostgreSQL, deployment options, and serving Shiny, Quarto, and FastAPI applications. Its Markdown is intentionally limited to authoring prompts, so authors can substantially revise it without changing Python route code.
 
 ## Run locally
 
@@ -36,7 +36,14 @@ src/earl_workshop/      FastAPI app, loader, templates, and CSS
 tests/                  content, persistence, authentication, and admin workflow tests
 ```
 
-The supplied files under `assets/` are the branding authority. `assets/brand.md` currently approves `#E31837` as the primary colour and `#1D252D` as the secondary colour; the CSS uses those values and a system sans-serif fallback. The supplied `assets/cg-lion-news-cover-lion-jpg.jpg` is the visual source for the canonical local `assets/logo.svg` and `assets/favicon.png` files. The logo URL is served as SVG and the favicon URL as PNG; no external fonts, logos, CDN, or JavaScript framework is required.
+The public Learn more page uses these local thumbnail files:
+
+- `src/earl_workshop/static/images/peoplecert-placeholder.png`
+- `src/earl_workshop/static/images/city-guilds-placeholder.png`
+
+Replace either file with your own PNG using the same name to update the corresponding card. A landscape image with a 3:2 aspect ratio works best.
+
+The supplied files under `assets/` are the branding authority. `assets/brand.md` currently approves `#E31837` as the primary colour and `#1D252D` as the secondary colour; the CSS uses those values and a system sans-serif fallback. The visible logo uses the supplied self-contained `assets/cg-lion-news-cover-lion-jpg.jpg`, while the favicon uses `assets/favicon.png`. The SVG source is retained as a reference, but it links to a nested image resource and is unreliable when used as an HTML image. No external fonts, logos, CDN, or JavaScript framework is required.
 
 ## Authoring course content
 
@@ -155,6 +162,8 @@ EARL_WORKSHOP_DATA_DIR=.data uv run earl-workshop create-admin
 
 The command prompts for a username, password, and confirmation. Portal roles are `admin` and `attendee`; administrator-only server routes return an authorization failure to attendees and anonymous requests. Login errors intentionally use one generic message, and inactive accounts cannot establish a session. Login and logout forms carry a token bound to the signed session; missing or invalid CSRF tokens are rejected.
 
+An attendee signs in with their unique username, not their optional display name. The display name is for presentation in the administrator area and is not unique enough to authenticate with.
+
 Portal account passwords are stored only as one-way Argon2 password hashes. They are not logged or returned by the application. VM passwords are a different credential type: they must be recoverable for the assigned attendee, so they are encrypted with `EARL_WORKSHOP_VM_ENCRYPTION_KEY` before being stored in the `vm_credentials.encrypted_password` field and decrypted only for that attendee's dashboard. The `vm_credentials` model stores the host and SSH username alongside that ciphertext; `vm_assignments` links a credential to an attendee and tracks whether it is active, with database uniqueness allowing at most one active VM per attendee and one active attendee per VM. Assignment lookup uses the authenticated session identity and never accepts an attendee-supplied record ID. An attendee without an active assignment sees a waiting state.
 
 ## Administrator operations
@@ -178,7 +187,7 @@ encrypted password. Portal password resets invalidate the attendee's existing se
 
 Progress is calculated against the Markdown pages loaded from the current `content/` directory:
 the overview's completed count, total, and last-progress timestamp do not use a hard-coded page
-total. VMs are entered manually in v0.1.0; cloud provisioning and related infrastructure
+total. VMs are entered manually in v0.2.0; cloud provisioning and related infrastructure
 automation are deferred.
 
 Build an installable wheel with:
@@ -187,12 +196,12 @@ Build an installable wheel with:
 uv build
 ```
 
-The wheel includes the package templates/CSS plus the current placeholder content, resources, and supplied asset files. When the package is run outside a source checkout, it falls back to those packaged files; set the content/resource/asset directory variables to use an external authoring or deployment directory.
+The wheel includes the package templates/CSS plus the current course skeleton, resources, and supplied asset files. When the package is run outside a source checkout, it falls back to those packaged files; set the content/resource/asset directory variables to use an external authoring or deployment directory.
 
 ## Deferred infrastructure
 
-This v0.1.0 increment does not include VM provisioning, SSH connectivity checks, VM health
+This v0.2.0 increment does not include VM provisioning, SSH connectivity checks, VM health
 monitoring, DigitalOcean/Terraform provisioning, production bootstrap automation, final
 curriculum, domain/TLS automation, or conference deployment. VM provisioning is not part of
-v0.1.0: administrators enter VM records manually through `/admin`. It also does not require
+v0.2.0: administrators enter VM records manually through `/admin`. It also does not require
 Node.js.

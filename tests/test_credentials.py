@@ -105,21 +105,33 @@ def test_two_attendees_only_see_their_own_active_vm_credentials(tmp_path: Path) 
     login(client_a, "attendee-a", "password-a")
     response_a = client_a.get("/attendee?vm_credential_id=2")
     assert response_a.status_code == 200
-    assert "198.51.100.10" in response_a.text
-    assert "alice" in response_a.text
-    assert "password-a-vm" in response_a.text
+    assert "View VM credentials" in response_a.text
+    assert "198.51.100.10" not in response_a.text
+    assert "alice" not in response_a.text
+    assert "password-a-vm" not in response_a.text
     assert "198.51.100.11" not in response_a.text
     assert "password-b-vm" not in response_a.text
+    assert client_a.get("/attendee/credentials/password").text == "password-a-vm"
+
+    shown_a = client_a.get("/attendee?show_credentials=true")
+    assert "198.51.100.10" in shown_a.text
+    assert "alice" in shown_a.text
+    assert "password-a-vm" not in shown_a.text
+    assert "••••••••" in shown_a.text
 
     client_b = TestClient(app)
     login(client_b, "attendee-b", "password-b")
     response_b = client_b.get("/attendee")
     assert response_b.status_code == 200
-    assert "198.51.100.11" in response_b.text
-    assert "bob" in response_b.text
-    assert "password-b-vm" in response_b.text
+    assert "View VM credentials" in response_b.text
+    assert "198.51.100.11" not in response_b.text
+    assert "bob" not in response_b.text
+    assert "password-b-vm" not in response_b.text
     assert "198.51.100.10" not in response_b.text
     assert "password-a-vm" not in response_b.text
+    password_b = client_b.get("/attendee/credentials/password")
+    assert password_b.text == "password-b-vm"
+    assert password_b.headers["cache-control"] == "no-store"
 
 
 def test_anonymous_and_unassigned_attendees_are_safe(tmp_path: Path) -> None:
@@ -128,14 +140,16 @@ def test_anonymous_and_unassigned_attendees_are_safe(tmp_path: Path) -> None:
 
     anonymous = TestClient(app)
     assert anonymous.get("/attendee").status_code == 401
+    assert anonymous.get("/attendee/credentials/password").status_code == 401
 
     client = TestClient(app)
     login(client, "waiting", "waiting-password")
-    response = client.get("/attendee")
+    response = client.get("/attendee?show_credentials=true")
     assert response.status_code == 200
-    assert "Your VM is not assigned yet" in response.text
-    assert "Assignment pending" in response.text
+    assert "No VM assigned" in response.text
+    assert "Please check again later." in response.text
     assert "Copy password" not in response.text
+    assert client.get("/attendee/credentials/password").status_code == 404
 
 
 def test_active_assignment_is_one_per_attendee_and_one_per_vm(tmp_path: Path) -> None:
@@ -209,14 +223,14 @@ def test_wrong_vm_key_returns_safe_unavailable_response(tmp_path: Path) -> None:
     )
     client = TestClient(wrong_key_app)
     login(client, "attendee", "account-password")
-    response = client.get("/attendee")
+    response = client.get("/attendee?show_credentials=true")
     assert response.status_code == 503
     assert "Connection details unavailable" in response.text
     assert "secret-vm-password" not in response.text
     assert credential.encrypted_password not in response.text
 
 
-def test_attendee_dashboard_has_selectable_values_and_local_copy_enhancement(
+def test_attendee_dashboard_hides_credentials_and_copies_the_password_on_demand(
     tmp_path: Path,
 ) -> None:
     app = create_app(settings_for(tmp_path))
@@ -235,6 +249,12 @@ def test_attendee_dashboard_has_selectable_values_and_local_copy_enhancement(
     login(client, "attendee", "account-password")
     response = client.get("/attendee")
     assert response.status_code == 200
+    assert "View VM credentials" in response.text
+    assert "vm.example.test" not in response.text
+    assert "student" not in response.text
+    assert "selectable-vm-password" not in response.text
+
+    response = client.get("/attendee?show_credentials=true")
     assert (
         '<code id="vm-host" class="credential-value" tabindex="0">vm.example.test</code>'
         in response.text
@@ -244,14 +264,18 @@ def test_attendee_dashboard_has_selectable_values_and_local_copy_enhancement(
         in response.text
     )
     assert (
-        '<code id="vm-password" class="credential-value" tabindex="0">'
-        "selectable-vm-password</code>"
-        in response.text
+        '<code id="vm-password" class="credential-value" aria-label="SSH password hidden">'
+        "••••••••</code>" in response.text
     )
+    assert "selectable-vm-password" not in response.text
     assert 'data-copy-target="vm-host"' in response.text
     assert 'data-copy-target="vm-username"' in response.text
-    assert 'data-copy-target="vm-password"' in response.text
+    assert 'data-copy-url="/attendee/credentials/password"' in response.text
+    password = client.get("/attendee/credentials/password")
+    assert password.text == "selectable-vm-password"
+    assert password.headers["cache-control"] == "no-store"
     assert '<script src="/static/attendee.js" defer></script>' in response.text
     script = client.get("/static/attendee.js")
     assert script.status_code == 200
     assert "navigator.clipboard" in script.text
+    assert "fetch(button.dataset.copyUrl" in script.text

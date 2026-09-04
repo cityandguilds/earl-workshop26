@@ -11,7 +11,13 @@ from pathlib import Path, PurePosixPath
 from urllib.parse import quote, urlsplit
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Query, Request, status
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
+from fastapi.responses import (
+    FileResponse,
+    HTMLResponse,
+    PlainTextResponse,
+    RedirectResponse,
+    Response,
+)
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, select
@@ -38,6 +44,7 @@ from .credentials import (
     VMEncryptionError,
     attendee_connection,
     create_vm_credential,
+    get_active_assignment,
     reassign_vm_credential,
     update_vm_credential,
     validate_vm_encryption_key,
@@ -55,9 +62,10 @@ from .db import (
     set_page_completion,
 )
 
-# The canonical brand entry points are committed local assets. The SVG and PNG both use
-# the supplied City & Guilds lion artwork; no network or runtime asset generation is needed.
-BRAND_LOGO_NAME = "logo.svg"
+# The supplied JPEG is the self-contained City & Guilds lion artwork.  `logo.svg`
+# references that JPEG as a nested resource, which is not reliable when the SVG is itself
+# used as an <img>.  Serve the JPEG directly for the visible brand mark.
+BRAND_LOGO_NAME = "cg-lion-news-cover-lion-jpg.jpg"
 BRAND_FAVICON_NAME = "favicon.png"
 
 
@@ -179,9 +187,7 @@ def _admin_data(db: Session, workshop: Workshop) -> dict[str, object]:
     """Load the complete current attendee and VM overview for an administrator."""
 
     attendees = db.scalars(
-        select(User)
-        .where(User.role == UserRole.ATTENDEE.value)
-        .order_by(User.username)
+        select(User).where(User.role == UserRole.ATTENDEE.value).order_by(User.username)
     ).all()
     attendee_ids = tuple(attendee.id for attendee in attendees)
     page_ids = tuple(page.id for page in workshop.pages)
@@ -291,9 +297,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get(f"/assets/{BRAND_LOGO_NAME}", include_in_schema=False)
     async def brand_logo() -> FileResponse:
-        return FileResponse(
-            runtime_settings.asset_dir / BRAND_LOGO_NAME, media_type="image/svg+xml"
-        )
+        return FileResponse(runtime_settings.asset_dir / BRAND_LOGO_NAME, media_type="image/jpeg")
 
     @app.get(f"/assets/{BRAND_FAVICON_NAME}", include_in_schema=False)
     async def brand_favicon() -> FileResponse:
@@ -305,10 +309,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def healthz() -> dict[str, str]:
         return {"status": "ok"}
 
-    def _attendee_dashboard_response(request: Request, db: Session, user: User) -> Response:
+    def _attendee_dashboard_response(
+        request: Request, db: Session, user: User, *, show_credentials: bool = False
+    ) -> Response:
         context = _template_context(
             request, settings=runtime_settings, workshop=workshop, user=user
         )
+        assignment = get_active_assignment(db, attendee_id=user.id)
+        context["vm_assigned"] = assignment is not None
+        context["show_credentials"] = show_credentials
+        if not show_credentials or assignment is None:
+            return templates.TemplateResponse(
+                request=request, name="attendee.html", context=context
+            )
         try:
             context["vm_connection"] = attendee_connection(
                 db,
@@ -331,14 +344,24 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return templates.TemplateResponse(request=request, name="attendee.html", context=context)
 
     @app.get("/", response_class=HTMLResponse)
-    async def landing_page(
+    async def landing_page(request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
+        user = current_user(db, request)
+        context = _template_context(
+            request, settings=runtime_settings, workshop=workshop, user=user
+        )
+        return templates.TemplateResponse(request=request, name="index.html", context=context)
+
+    @app.get("/learn-more", response_class=HTMLResponse)
+    async def learn_more_page(
         request: Request, db: Session = Depends(get_db)
     ) -> HTMLResponse:
         user = current_user(db, request)
         context = _template_context(
             request, settings=runtime_settings, workshop=workshop, user=user
         )
-        return templates.TemplateResponse(request=request, name="index.html", context=context)
+        return templates.TemplateResponse(
+            request=request, name="learn_more.html", context=context
+        )
 
     @app.get("/course", response_class=HTMLResponse)
     async def course_index(request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
@@ -404,9 +427,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
 
     @app.get("/portal", response_class=HTMLResponse)
-    async def portal_page(
-        request: Request, db: Session = Depends(get_db)
-    ) -> Response:
+    async def portal_page(request: Request, db: Session = Depends(get_db)) -> Response:
         user = require_authenticated_user(db, request)
         if user.role == UserRole.ATTENDEE.value:
             return _attendee_dashboard_response(request, db, user)
@@ -730,9 +751,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 response_status=status.HTTP_400_BAD_REQUEST,
             )
         try:
-            reassign_vm_credential(
-                db, vm_credential_id=vm_credential_id, attendee_id=target_id
-            )
+            reassign_vm_credential(db, vm_credential_id=vm_credential_id, attendee_id=target_id)
         except ValueError as exc:
             db.rollback()
             return _admin_page_response(
@@ -749,9 +768,38 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return _admin_redirect(f"VM credential assigned to {target_name}")
 
     @app.get("/attendee", response_class=HTMLResponse)
-    async def attendee_page(request: Request, db: Session = Depends(get_db)) -> Response:
+    async def attendee_page(
+        request: Request,
+        show_credentials: bool = Query(default=False),
+        db: Session = Depends(get_db),
+    ) -> Response:
         user = require_role(db, request, UserRole.ATTENDEE)
-        return _attendee_dashboard_response(request, db, user)
+        return _attendee_dashboard_response(request, db, user, show_credentials=show_credentials)
+
+    @app.get("/attendee/credentials/password", response_class=PlainTextResponse)
+    async def attendee_vm_password(
+        request: Request, db: Session = Depends(get_db)
+    ) -> PlainTextResponse:
+        """Return an attendee's password only in response to their copy action."""
+
+        user = require_role(db, request, UserRole.ATTENDEE)
+        try:
+            connection = attendee_connection(
+                db,
+                attendee_id=user.id,
+                encryption_key=runtime_settings.vm_encryption_key,
+            )
+        except VMEncryptionError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="VM credentials are temporarily unavailable",
+            ) from exc
+        if connection is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="VM not assigned")
+        return PlainTextResponse(
+            connection.ssh_password,
+            headers={"Cache-Control": "no-store", "Pragma": "no-cache"},
+        )
 
     @app.get("/resources/{resource_path:path}", name="public_resource")
     async def public_resource(resource_path: str) -> FileResponse:
@@ -832,9 +880,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             page_id=page.id,
             completed=is_completed,
         )
-        return RedirectResponse(
-            url=f"/course/{page.id}", status_code=status.HTTP_303_SEE_OTHER
-        )
+        return RedirectResponse(url=f"/course/{page.id}", status_code=status.HTTP_303_SEE_OTHER)
 
     return app
 

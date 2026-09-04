@@ -4,9 +4,7 @@
 
 {% block content %}
 <section class="dashboard" aria-labelledby="attendee-title">
-  <p class="eyebrow">Attendee dashboard</p>
-  <h1 id="attendee-title">Your workshop VM</h1>
-  <p class="dashboard-intro">Use the connection details below to access the VM assigned to you.</p>
+  <h1 id="attendee-title">Your VM</h1>
 
   {% if credential_error %}
   <section class="callout credential-error" role="alert" aria-labelledby="credential-error-title">
@@ -16,14 +14,17 @@
       <p>{{ credential_error }}</p>
     </div>
   </section>
+  {% elif vm_assigned and not show_credentials %}
+  <section class="credentials-prompt" aria-labelledby="credentials-prompt-title">
+    <h2 id="credentials-prompt-title">Credentials</h2>
+    <a class="button credentials-button" href="/attendee?show_credentials=true">View VM credentials</a>
+  </section>
   {% elif vm_connection %}
   <section class="connection-card" aria-labelledby="connection-title">
     <div class="connection-heading">
       <div>
-        <p class="eyebrow">Assigned connection</p>
-        <h2 id="connection-title">Connect securely</h2>
+        <h2 id="connection-title">Credentials</h2>
       </div>
-      <span class="assignment-badge">Ready</span>
     </div>
 
     <dl class="credential-list">
@@ -44,24 +45,23 @@
       <div class="credential-row">
         <dt>SSH password</dt>
         <dd>
-          <code id="vm-password" class="credential-value" tabindex="0">{{ vm_connection.ssh_password }}</code>
-          <button class="copy-button" type="button" data-copy-target="vm-password" data-copy-label="Password">Copy password</button>
+          <code id="vm-password" class="credential-value" aria-label="SSH password hidden">••••••••</code>
+          <button class="copy-button" type="button" data-copy-url="/attendee/credentials/password" data-copy-label="SSH password">Copy password</button>
         </dd>
       </div>
     </dl>
 
     <div class="ssh-example">
-      <p class="eyebrow">Example command</p>
       <code id="ssh-command">ssh {{ vm_connection.ssh_username }}@{{ vm_connection.host }}</code>
       <button class="copy-button" type="button" data-copy-target="ssh-command" data-copy-label="SSH command">Copy command</button>
     </div>
     <p class="copy-status" data-copy-status aria-live="polite"></p>
+    <a class="header-link credentials-back" href="/attendee">Hide credentials</a>
   </section>
   {% else %}
   <section class="waiting-panel" role="status" aria-labelledby="waiting-title">
-    <p class="eyebrow">Assignment pending</p>
-    <h2 id="waiting-title">Your VM is not assigned yet</h2>
-    <p>The workshop team has not assigned a VM to your account. This page will update with connection details when one is ready.</p>
+    <h2 id="waiting-title">No VM assigned</h2>
+    <p>Please check again later.</p>
   </section>
   {% endif %}
 </section>

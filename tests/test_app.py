@@ -48,7 +48,8 @@ def test_health_and_branded_landing_page(tmp_path: Path) -> None:
     assert "Development to Deployment" in landing.text
     assert "Infrastructure for Data Teams" in landing.text
     assert "/static/site.css" in landing.text
-    logo_url = "/assets/logo.svg"
+    assert 'href="/learn-more"' in landing.text
+    logo_url = "/assets/cg-lion-news-cover-lion-jpg.jpg"
     favicon_url = "/assets/favicon.png"
     assert f'<link rel="icon" href="{favicon_url}" type="image/png">' in landing.text
     assert landing.text.count(f'src="{logo_url}"') == 2
@@ -57,10 +58,38 @@ def test_health_and_branded_landing_page(tmp_path: Path) -> None:
     favicon = client.get(favicon_url)
     assert logo.status_code == 200
     assert favicon.status_code == 200
-    assert logo.headers["content-type"].startswith("image/svg+xml")
+    assert logo.headers["content-type"].startswith("image/jpeg")
     assert favicon.headers["content-type"].startswith("image/png")
-    assert logo.content.lstrip().startswith(b"<svg")
+    assert logo.content.startswith(b"\xff\xd8\xff")
     assert favicon.content.startswith(b"\x89PNG\r\n\x1a\n")
+
+
+def test_learn_more_page_links_to_official_course_sites(tmp_path: Path) -> None:
+    settings = Settings(
+        root_dir=Path("."),
+        content_dir=Path("content"),
+        resources_dir=Path("resources"),
+        asset_dir=Path("assets"),
+        data_dir=tmp_path / "runtime-data",
+        session_secret="test-session-secret-which-is-long-enough",
+        vm_encryption_key=TEST_VM_ENCRYPTION_KEY,
+    )
+    client = TestClient(create_app(settings))
+
+    page = client.get("/learn-more")
+    assert page.status_code == 200
+    assert "PeopleCert" in page.text
+    assert "City &amp; Guilds" in page.text
+    assert "https://www.peoplecert.org/organizations/browse-certifications" in page.text
+    assert "https://www.cityandguilds.com/Home/qualifications-and-apprenticeships" in page.text
+    for image_url in (
+        "/static/images/peoplecert-placeholder.png",
+        "/static/images/city-guilds-placeholder.png",
+    ):
+        assert image_url in page.text
+        image = client.get(image_url)
+        assert image.status_code == 200
+        assert image.headers["content-type"].startswith("image/png")
 
 
 def test_course_page_is_rendered_from_loaded_content(tmp_path: Path) -> None:
@@ -99,7 +128,7 @@ def test_course_page_is_rendered_from_loaded_content(tmp_path: Path) -> None:
     response = client.get("/course/runtime")
 
     assert response.status_code == 200
-    assert "Describe a runnable environment" in response.text
+    assert "Set up the application runtime" in response.text
     assert "echo &quot;hello from the workshop&quot;" in response.text
     assert client.get("/course/not-a-page").status_code == 404
 

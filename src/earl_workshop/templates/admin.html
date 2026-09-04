@@ -4,22 +4,20 @@
 
 {% block content %}
 <section class="admin-page" aria-labelledby="admin-title">
-  <p class="eyebrow">Administrator area</p>
-  <h1 id="admin-title">Portal administration</h1>
-  <p class="admin-intro">Manage attendee access, manually entered VM credentials, assignments, and progress for the current course.</p>
+  <h1 id="admin-title">Admin</h1>
 
   {% if admin_notice %}<p class="form-success" role="status">{{ admin_notice }}</p>{% endif %}
   {% if admin_error %}<p class="form-error" role="alert">{{ admin_error }}</p>{% endif %}
 
   <div class="admin-panels">
     <section class="admin-panel" aria-labelledby="new-attendee-title">
-      <p class="eyebrow">Accounts</p>
       <h2 id="new-attendee-title">Create attendee</h2>
       <form class="admin-form" method="post" action="/admin/attendees/create">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <label for="attendee-username">Username</label>
-        <input id="attendee-username" name="username" value="{{ admin_form_values.attendee_username | default('', true) }}" autocomplete="username" required>
-        <label for="attendee-display-name">Display name <span>(optional)</span></label>
+        <label for="attendee-username">Sign-in username</label>
+        <input id="attendee-username" name="username" value="{{ admin_form_values.attendee_username | default('', true) }}" autocomplete="username" aria-describedby="attendee-username-help" required>
+        <p id="attendee-username-help" class="admin-help">This unique username is what the attendee enters to sign in.</p>
+        <label for="attendee-display-name">Display name <span>(optional; not used for sign-in)</span></label>
         <input id="attendee-display-name" name="display_name" value="{{ admin_form_values.attendee_display_name | default('', true) }}" autocomplete="name">
         <label for="attendee-password">Initial password</label>
         <input id="attendee-password" name="password" type="password" autocomplete="new-password" required>
@@ -30,9 +28,7 @@
     </section>
 
     <section class="admin-panel" aria-labelledby="new-vm-title">
-      <p class="eyebrow">Infrastructure</p>
       <h2 id="new-vm-title">Create VM credential</h2>
-      <p class="admin-help">VMs are entered manually in v0.1.0; provisioning is deferred.</p>
       <form class="admin-form" method="post" action="/admin/vms/create">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <label for="vm-host">Host / IP</label>
@@ -51,7 +47,6 @@
   <section class="admin-panel admin-table-panel" aria-labelledby="attendees-title">
     <div class="admin-section-heading">
       <div>
-        <p class="eyebrow">People</p>
         <h2 id="attendees-title">Attendees</h2>
       </div>
       <span>{{ attendee_rows | length }} account{% if attendee_rows | length != 1 %}s{% endif %}</span>
@@ -110,8 +105,7 @@
   <section class="admin-panel admin-table-panel" aria-labelledby="vms-title">
     <div class="admin-section-heading">
       <div>
-        <p class="eyebrow">VM credentials</p>
-        <h2 id="vms-title">VM credentials and assignments</h2>
+        <h2 id="vms-title">VMs</h2>
       </div>
       <span>{{ vm_rows | length }} credential{% if vm_rows | length != 1 %}s{% endif %}</span>
     </div>

@@ -1,6 +1,6 @@
 ---
 id: orientation
-title: Find your way around
+title: Welcome and workshop map
 order: 10
 section: Getting started
 section_order: 10
@@ -9,8 +9,10 @@ resources:
     label: Workshop example note
 ---
 
-This short page is a placeholder for the workshop welcome and orientation.
+This page introduces the workshop and maps the path from development to deployment.
 
-## A useful first check
+## To be authored
 
-Confirm that you can reach the workshop portal and identify the machine you will use for the exercises.
+- Welcome and intended outcomes
+- How the workshop is organised
+- The environments and applications covered during the day

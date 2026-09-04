@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block title %}Learn more · {{ workshop.title }}{% endblock %}
+
+{% block content %}
+<section class="learn-page" aria-labelledby="learn-title">
+  <h1 id="learn-title">Learn more</h1>
+  <div class="learn-cards">
+    <a class="learn-card" href="https://www.peoplecert.org/organizations/browse-certifications" target="_blank" rel="noopener noreferrer">
+      <img src="/static/images/peoplecert-placeholder.png" alt="">
+      <span class="learn-card-copy">
+        <strong>PeopleCert</strong>
+        <span>Courses and certifications</span>
+      </span>
+    </a>
+    <a class="learn-card" href="https://www.cityandguilds.com/Home/qualifications-and-apprenticeships" target="_blank" rel="noopener noreferrer">
+      <img src="/static/images/city-guilds-placeholder.png" alt="">
+      <span class="learn-card-copy">
+        <strong>City &amp; Guilds</strong>
+        <span>Courses and qualifications</span>
+      </span>
+    </a>
+  </div>
+</section>
+{% endblock %}

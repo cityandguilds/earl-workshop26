@@ -4,20 +4,18 @@
 
 {% block content %}
 <nav class="breadcrumbs" aria-label="Breadcrumb">
-  <a href="/">Workshop home</a>
+  <a href="/">Home</a>
   <span aria-hidden="true">/</span>
   <span>{{ page.section }}</span>
 </nav>
 
 <article class="course-article">
   <header class="article-header">
-    <p class="eyebrow">{{ page.section }} · page {{ "%02d" | format(page_index + 1) }}</p>
     <h1>{{ page.title }}</h1>
     {% if page.resources %}
     <details class="resources-menu">
       <summary>Page resources ({{ page.resources | length }})</summary>
       <div class="resources-panel" aria-label="Page resources">
-        <p class="resource-intro">Teaching files are public so you can fetch them from your VM.</p>
         <ul>
           {% for resource in resource_links %}
           <li class="resource-item">
@@ -46,7 +44,6 @@
         </label>
         <button class="button" type="submit">Save progress</button>
       </form>
-      {% if page_complete %}<p class="completion-hint">Uncheck and save to mark this page incomplete.</p>{% else %}<p class="completion-hint">Check and save when you have finished this page.</p>{% endif %}
       <p class="progress-summary">{{ progress_summary.completed }} of {{ progress_summary.total }} pages complete ({{ progress_summary.percentage }}%).</p>
     </section>
   </header>
