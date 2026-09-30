@@ -26,7 +26,9 @@ log "Installing packages"
 apt-get install -y \
   ca-certificates curl wget git unzip gnupg \
   software-properties-common apt-transport-https \
-  build-essential lsb-release jq openssl nginx \
+  build-essential pkg-config lsb-release jq openssl nginx \
+  libcurl4-openssl-dev libssl-dev libpq-dev \
+  libxml2-dev libuv1-dev \
   python3 python3-pip python3-venv \
   postgresql postgresql-contrib \
   openjdk-17-jdk r-base r-base-dev \
@@ -45,7 +47,12 @@ install -d -m 0755 /etc/dsi
 
 # Install R packages
 log "Installing R packages"
-Rscript -e "install.packages(c('shiny','RPostgres','DBI','httr','jsonlite'), repos='https://cloud.r-project.org')"
+Rscript --vanilla -e \
+  "install.packages(
+    c('shiny', 'RPostgres', 'DBI', 'httr', 'jsonlite'),
+    repos='https://cloud.r-project.org',
+    Ncpus=1
+  )"
 
 # Install Shiny Server
 log "Installing Shiny Server"
