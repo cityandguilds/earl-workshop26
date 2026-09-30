@@ -23,6 +23,15 @@ fi
 
 # Install base software
 log "Installing packages"
+wget -qO- \
+  https://cloud.r-project.org/bin/linux/ubuntu/marutter_pubkey.asc \
+  > /etc/apt/trusted.gpg.d/cran_ubuntu_key.asc
+
+add-apt-repository \
+  "deb https://cloud.r-project.org/bin/linux/ubuntu noble-cran40/"
+
+apt-get update
+
 apt-get install -y \
   ca-certificates curl wget git unzip gnupg \
   software-properties-common apt-transport-https \
@@ -31,7 +40,7 @@ apt-get install -y \
   libxml2-dev libuv1-dev \
   python3 python3-pip python3-venv \
   postgresql postgresql-contrib \
-  openjdk-17-jdk r-base r-base-dev \
+  openjdk-21-jdk r-base r-base-dev \
   certbot python3-certbot-nginx
 
 # Create persistent participant account
@@ -57,10 +66,37 @@ Rscript --vanilla -e \
 # Install Shiny Server
 log "Installing Shiny Server"
 SHINY_SERVER_VERSION="1.5.23.1030"
-wget -q \
-  "https://download3.rstudio.org/ubuntu-22.04/x86_64/shiny-server-${SHINY_SERVER_VERSION}-amd64.deb" \
-  -O /tmp/shiny-server.deb
-apt-get install -y /tmp/shiny-server.deb
+SHINY_SERVER_DEB="/tmp/shiny-server.deb"
+SHINY_SERVER_URL="https://download3.rstudio.org/ubuntu-20.04/x86_64/shiny-server-${SHINY_SERVER_VERSION}-amd64.deb"
+
+rm -f "$SHINY_SERVER_DEB"
+
+wget \
+  --https-only \
+  --tries=5 \
+  --timeout=30 \
+  --output-document="$SHINY_SERVER_DEB" \
+  "$SHINY_SERVER_URL"
+
+dpkg-deb --info "$SHINY_SERVER_DEB" >/dev/null
+
+apt-get install -y "$SHINY_SERVER_DEB"
+
+log "Restricting Shiny Server to localhost"
+cat > /etc/shiny-server/shiny-server.conf <<'CONF'
+run_as shiny;
+
+server {
+  listen 3838 127.0.0.1;
+
+  location / {
+    site_dir /srv/shiny-server;
+    log_dir /var/log/shiny-server;
+    directory_index on;
+  }
+}
+CONF
+
 systemctl enable shiny-server
 
 # Prepare FastAPI
@@ -123,11 +159,25 @@ usermod -aG docker student
 
 # Install ShinyProxy (runs as root rather than via dedicated shiny proxy service account)
 log "Installing ShinyProxy"
+
 SHINYPROXY_VERSION="3.2.4"
+SHINYPROXY_SHA256="0bd68e3ba31b5288b5523ee250e90f316f5e0524bd11bcc18645499ede1ee57e"
+SHINYPROXY_JAR="/opt/shinyproxy/shinyproxy.jar"
+
 install -d -m 0755 /opt/shinyproxy /etc/shinyproxy
-wget -q \
-  "https://repo1.maven.org/maven2/eu/openanalytics/shinyproxy/${SHINYPROXY_VERSION}/shinyproxy-${SHINYPROXY_VERSION}.jar" \
-  -O /opt/shinyproxy/shinyproxy.jar
+rm -f "$SHINYPROXY_JAR"
+
+curl --fail --location \
+  --retry 5 \
+  --retry-all-errors \
+  --connect-timeout 15 \
+  --output "$SHINYPROXY_JAR" \
+  "https://github.com/openanalytics/shinyproxy/releases/download/v${SHINYPROXY_VERSION}/shinyproxy-${SHINYPROXY_VERSION}.jar"
+
+echo "${SHINYPROXY_SHA256}  ${SHINYPROXY_JAR}" |
+  sha256sum --check -
+
+test -s "$SHINYPROXY_JAR"
 
 cat > /etc/shinyproxy/application.yml <<'YAML'
 proxy:
@@ -136,9 +186,15 @@ proxy:
     - id: hello
       display-name: Hello App
       container-image: openanalytics/shinyproxy-demo
+
 server:
   address: 127.0.0.1
   port: 8081
+
+management:
+  server:
+    address: 127.0.0.1
+    port: 9090
 YAML
 
 cat > /etc/systemd/system/shinyproxy.service <<'UNIT'
@@ -259,7 +315,49 @@ nginx -t
 
 # Enable services
 systemctl daemon-reload
-systemctl enable nginx shinyproxy dsi-fastapi certbot.timer
+# startup readiness validation
+systemctl enable --now shiny-server shinyproxy
+
+for attempt in $(seq 1 30); do
+  if curl --fail --silent \
+      --output /dev/null \
+      http://127.0.0.1:8081/; then
+    echo "ShinyProxy is ready"
+    break
+  fi
+
+  if ! systemctl is-active --quiet shinyproxy; then
+    echo "ERROR: ShinyProxy failed during startup" >&2
+    journalctl -u shinyproxy -n 100 --no-pager
+    exit 1
+  fi
+
+  if [[ "$attempt" -eq 30 ]]; then
+    echo "ERROR: ShinyProxy readiness timeout" >&2
+    journalctl -u shinyproxy -n 100 --no-pager
+    exit 1
+  fi
+
+  sleep 2
+done
+
+systemctl enable nginx dsi-fastapi certbot.timer
 systemctl restart postgresql nginx
+
+test "$(curl --fail --silent http://127.0.0.1:3838/ |
+  wc -c)" -gt 0
+
+curl --fail --silent \
+  --output /dev/null \
+  http://127.0.0.1:8081/
+
+ss -lnt |
+  grep -q '127.0.0.1:3838'
+
+ss -lnt |
+  grep -q '127.0.0.1:8081'
+
+ss -lnt |
+  grep -q '127.0.0.1:9090'
 
 log "Golden-image build completed"

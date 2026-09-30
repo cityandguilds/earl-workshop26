@@ -294,11 +294,13 @@ echo "$BUILD_ID $BUILD_IP"
 ssh "root@${BUILD_IP}"
 ```
 
-### Run a pinned bootstrap script
+### Run a pinned bootstrap script on builder
 Calculate the checksum from the exact pinned file:
 
 ```bash
-BOOTSTRAP_URL="https://raw.githubusercontent.com/cityandguilds/earl-workshop26/858e2d6b7190adc4b1def72ac76d6bfc66b95ec8/resources/bootstrap.sh"
+# ssh "root@${BUILD_IP}"
+
+BOOTSTRAP_URL="https://raw.githubusercontent.com/cityandguilds/earl-workshop26/refs/heads/main/resources/bootstrap.sh"
 BOOTSTRAP_SHA256=REPLACE_WITH_REAL_SHA256
 
 curl -fsSL "$BOOTSTRAP_URL" -o /tmp/bootstrap.sh
@@ -404,6 +406,15 @@ SNAPSHOT_ID=$(doctl compute image list-user \
 
 test -n "$SNAPSHOT_ID"
 echo "$SNAPSHOT_ID"
+```
+
+You should also be able to see the snapshot in the DigitalOcean UI, under Core Cloud → Backups & Snapshots → Snapshots.
+
+It's safe to delete the builder droplet now:
+
+```bash
+doctl compute snapshot list --resource droplet
+doctl compute droplet delete dsi-image-builder
 ```
 
 ## Participant cloud-init template
