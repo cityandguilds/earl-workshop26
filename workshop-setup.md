@@ -32,7 +32,7 @@ If these return account and region information, authentication is working.
 
 ## prepare domain
 - Create a workshop sub-domain in DigitalOcean (Core Cloud → Networking → Domains → Add a domain), e.g. `earl.sjp-analytics.co.uk`.
-- Delegate that subdomain in Cloudflare. Create NS records in the DNS Records section using the DigitalOcean nameservers. "For anything under earl.sjp-analytics.co.uk, ask DigitalOcean."
+- Delegate sub-domain in Cloudflare or other DNS provider. Create NS records using DigitalOcean nameservers (→ DNS Records). "For anything earl.sjp-analytics.co.uk, ask DigitalOcean."
 
 Example participant hostnames:
 
@@ -40,7 +40,7 @@ Example participant hostnames:
 dsi-01.earl.sjp-analytics.co.uk
 dsi-02.earl.sjp-analytics.co.uk
 ...
-dsi-10.earl.sjp-analytics.co.uk
+dsi-09.earl.sjp-analytics.co.uk
 ```
 
 DNS works like an address book. Each participant hostname receives an `A` record pointing to that participant Droplet's public IPv4 address:
@@ -84,6 +84,8 @@ required_variables=(
   BUILDER_FIREWALL_NAME
   BUILD_DROPLET
   SNAPSHOT_NAME
+  BOOTSTRAP_URL
+  BOOTSTRAP_SHA256
   PARTICIPANT_TAG
   PARTICIPANT_SIZE
   PARTICIPANT_FIREWALL_NAME
@@ -113,9 +115,10 @@ doctl compute image list-distribution --public
 
 Region-droplet combination options for builder:
 
-Slug                         Description                      Memory     VCPUs    Disk    Price Monthly    Price Hourly  Region
-s-1vcpu-2gb-intel            Basic Intel                      2048       1        50      14.00            0.020830        lon1
-s5-1vcpu-3gb-50gb            v5 Shared                        3072       1        50      25.89            0.034800        atl1
+| Slug              | Description | Memory (MB) | vCPUs | Disk (GB) | Price Monthly | Price Hourly | Region |
+| ----------------- | ----------- | ----------: | ----: | --------: | ------------: | -----------: | ------ |
+| s-1vcpu-2gb-intel | Basic Intel |        2048 |     1 |        50 |         14.00 |     0.020830 | lon1   |
+| s5-1vcpu-3gb-50gb | v5 Shared   |        3072 |     1 |        50 |         25.89 |     0.034800 | atl1   |
 
 ## Create the administrator SSH key record
 
@@ -287,23 +290,14 @@ ssh "root@${BUILD_IP}"
 ```
 
 ### Run a pinned bootstrap script
+Calculate the checksum from the exact pinned file:
 
 ```bash
-BOOTSTRAP_URL="https://raw.githubusercontent.com/earl-workshop26/resources/REPLACE_WITH_COMMIT_SHA/bootstrap.sh"
-BOOTSTRAP_SHA256="REPLACE_WITH_REAL_SHA256"
-
 curl -fsSL "$BOOTSTRAP_URL" -o /tmp/bootstrap.sh
 printf '%s  %s\n' "$BOOTSTRAP_SHA256" /tmp/bootstrap.sh \
   | sha256sum --check
 chmod 700 /tmp/bootstrap.sh
 sudo /tmp/bootstrap.sh
-```
-
-Calculate the checksum from the exact pinned file:
-
-```bash
-curl -fsSL "$BOOTSTRAP_URL" -o bootstrap.sh
-sha256sum bootstrap.sh
 ```
 
 ### Service layout
@@ -660,19 +654,19 @@ Treat all credentials as valid until they are explicitly expired or their Drople
 
 # Azure-to-DigitalOcean mapping
 
-| Azure | DigitalOcean replacement |
-| --- | --- |
-| Subscription | Account or team |
-| Resource groups | Project plus tags |
-| VNet and subnet | Regional VPC |
-| NSG | Cloud Firewall attached by tag |
-| VM | Droplet |
-| `az` | `doctl` |
-| Compute Gallery image version | Named Droplet snapshot |
-| VM custom data | User data and cloud-init |
-| `az vm run-command` | SSH, cloud-init, or configuration management |
-| `waagent -deprovision` | Clean cloud-init, machine ID, host keys, and credentials |
-| Public IP resource | Droplet public IPv4/IPv6 |
+| Azure                         | DigitalOcean replacement                                 |
+| ----------------------------- | -------------------------------------------------------- |
+| Subscription                  | Account or team                                          |
+| Resource groups               | Project plus tags                                        |
+| VNet and subnet               | Regional VPC                                             |
+| NSG                           | Cloud Firewall attached by tag                           |
+| VM                            | Droplet                                                  |
+| `az`                          | `doctl`                                                  |
+| Compute Gallery image version | Named Droplet snapshot                                   |
+| VM custom data                | User data and cloud-init                                 |
+| `az vm run-command`           | SSH, cloud-init, or configuration management             |
+| `waagent -deprovision`        | Clean cloud-init, machine ID, host keys, and credentials |
+| Public IP resource            | Droplet public IPv4/IPv6                                 |
 
 # Final pre-flight checklist
 
