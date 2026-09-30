@@ -60,7 +60,8 @@ The provisioning script currently assumes DigitalOcean DNS. Set `CREATE_DIGITALO
 - add env vars to `resources/workshop.env`
 
 ```bash
-chmod 600 resources/workshop.env
+cd resources
+chmod 600 workshop.env
 
 CONFIG_FILE="${1:-./workshop.env}"
 
@@ -69,7 +70,6 @@ if [[ ! -r "$CONFIG_FILE" ]]; then
   exit 1
 fi
 
-# shellcheck source=/dev/null
 source "$CONFIG_FILE"
 
 required_variables=(
@@ -177,8 +177,9 @@ if ! doctl vpcs list --format Name --no-header | grep -Fxq "$VPC_NAME"; then
 fi
 
 VPC_UUID=$(doctl vpcs list --format ID,Name --no-header \
-  | awk -v name="$VPC_NAME" '$2 == name {print $1; exit}')
-
+  | grep -F "$VPC_NAME" \
+  | cut -d' ' -f1)
+  
 test -n "$VPC_UUID"
 echo "$VPC_UUID"
 ```
@@ -282,9 +283,13 @@ BUILD_ID=$(doctl compute droplet list --format ID,Name --no-header \
 BUILD_IP=$(doctl compute droplet get "$BUILD_ID" \
   --format PublicIPv4 --no-header)
 
+PROJECT_ID=$(doctl projects list --format ID,Name --no-header \
+  | grep -F " $PROJECT_NAME" \
+  | awk '{print $1}')
+
 doctl projects resources assign "$PROJECT_ID" \
   --resource "do:droplet:$BUILD_ID"
-`
+
 echo "$BUILD_ID $BUILD_IP"
 ssh "root@${BUILD_IP}"
 ```
@@ -293,6 +298,9 @@ ssh "root@${BUILD_IP}"
 Calculate the checksum from the exact pinned file:
 
 ```bash
+BOOTSTRAP_URL="https://raw.githubusercontent.com/cityandguilds/earl-workshop26/858e2d6b7190adc4b1def72ac76d6bfc66b95ec8/resources/bootstrap.sh"
+BOOTSTRAP_SHA256=REPLACE_WITH_REAL_SHA256
+
 curl -fsSL "$BOOTSTRAP_URL" -o /tmp/bootstrap.sh
 printf '%s  %s\n' "$BOOTSTRAP_SHA256" /tmp/bootstrap.sh \
   | sha256sum --check
