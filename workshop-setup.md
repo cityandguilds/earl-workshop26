@@ -179,7 +179,7 @@ fi
 VPC_UUID=$(doctl vpcs list --format ID,Name --no-header \
   | grep -F "$VPC_NAME" \
   | cut -d' ' -f1)
-  
+
 test -n "$VPC_UUID"
 echo "$VPC_UUID"
 ```
@@ -250,7 +250,7 @@ fi
 
 ## Golden image
 
-DigitalOcean uses Droplet snapshots for golden images.
+DigitalOcean uses Droplet snapshots for golden images. Commands are captured separately in `resources/create-image.sh` but each stage is also stepped through here.
 
 ```text
 Builder Droplet
@@ -604,7 +604,7 @@ However, this only works if the golden image contains:
 
 /home/student/fastapi/main.py
 
-If workshop participants are expected to create the FastAPI application themselves, leaving it stopped is ok. 
+If workshop participants are expected to create the FastAPI application themselves, leaving it stopped is ok.
 /api/ will initially return 502 Bad Gateway. -->
 
 - Build the API.
