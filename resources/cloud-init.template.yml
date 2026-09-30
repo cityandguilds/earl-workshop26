@@ -1,0 +1,226 @@
+#cloud-config
+
+users:
+  - default
+  - name: student
+    gecos: Workshop Participant
+    shell: /bin/bash
+    groups:
+      - sudo
+      - docker
+    sudo: "ALL=(ALL) NOPASSWD:ALL"
+    lock_passwd: true
+    ssh_authorized_keys:
+      - __PARTICIPANT_SSH_PUBLIC_KEY__
+
+package_update: false
+package_upgrade: false
+
+write_files:
+  - path: /etc/dsi/participant-id
+    owner: root:root
+    permissions: "0644"
+    content: |
+      __PARTICIPANT_ID__
+
+  - path: /home/student/.config/code-server/config.yaml
+    owner: student:student
+    permissions: "0600"
+    content: |
+      bind-addr: 127.0.0.1:8080
+      auth: password
+      password: __CODE_PASSWORD__
+      cert: false
+
+  - path: /etc/ssh/sshd_config.d/00-workshop-hardening.conf
+    owner: root:root
+    permissions: "0644"
+    content: |
+      PasswordAuthentication no
+      KbdInteractiveAuthentication no
+      PubkeyAuthentication yes
+      PermitRootLogin prohibit-password
+`
+  - path: /etc/nginx/sites-available/dsi-workshop
+    owner: root:root
+    permissions: "0644"
+    content: |
+      map $http_upgrade $connection_upgrade {
+          default upgrade;
+          '' close;
+      }
+
+      server {
+          listen 80 default_server;
+          listen [::]:80 default_server;
+          server_name __PARTICIPANT_HOSTNAME__;
+
+          location = /healthz {
+              access_log off;
+              default_type text/plain;
+              return 200 'ok\n';        
+          }
+
+          location / {
+              root /var/www/html;
+              index index.html;
+          }
+
+          location /api/ {
+              proxy_pass http://127.0.0.1:8000/;
+              proxy_set_header Host $host;
+              proxy_set_header X-Forwarded-Proto $scheme;
+              proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+              proxy_set_header X-Real-IP $remote_addr;
+              proxy_set_header X-Forwarded-Host $host;
+          }
+
+          location /shiny/ {
+              proxy_pass http://127.0.0.1:3838/;
+              proxy_http_version 1.1;
+              proxy_set_header Upgrade $http_upgrade;
+              proxy_set_header Connection $connection_upgrade;
+              proxy_set_header Host $host;
+              proxy_set_header X-Real-IP $remote_addr;
+              proxy_set_header X-Forwarded-Host $host;
+          }
+
+          location /code/ {
+              proxy_pass http://127.0.0.1:8080/;
+              proxy_http_version 1.1;
+              proxy_set_header Upgrade $http_upgrade;
+              proxy_set_header Connection $connection_upgrade;
+              proxy_set_header Host $host;
+              proxy_set_header X-Real-IP $remote_addr;
+              proxy_set_header X-Forwarded-Host $host;
+          }
+
+          location /proxy/ {
+              proxy_pass http://127.0.0.1:8081/;
+              proxy_http_version 1.1;
+              proxy_set_header Upgrade $http_upgrade;
+              proxy_set_header Connection $connection_upgrade;
+              proxy_set_header Host $host;
+              proxy_set_header X-Real-IP $remote_addr;
+              proxy_set_header X-Forwarded-Host $host;
+          }
+
+          location = /code {
+              return 301 /code/;
+          }
+
+          location = /shiny {
+              return 301 /shiny/;
+          }
+
+          location = /proxy {
+              return 301 /proxy/;
+          }
+      }
+
+  - path: /root/configure-participant.sh
+    owner: root:root
+    permissions: "0700"
+    content: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      DB_PASSWORD='__DB_PASSWORD__'
+
+      trap 'echo "Participant configuration failed at line $LINENO" >&2' ERR
+
+      install -d -m 0755 /etc/dsi
+      install -d -o student -g student -m 0700 \
+        /home/student/.config \
+        /home/student/.config/code-server \
+        /home/student/.config/dsi
+
+      chown student:student \
+        /home/student/.config/code-server/config.yaml
+
+      sudo -u postgres psql --set=ON_ERROR_STOP=1 \
+        --set=db_password="$DB_PASSWORD" <<'SQL'
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT FROM pg_roles WHERE rolname = 'workshop_user'
+        ) THEN
+          CREATE ROLE workshop_user LOGIN;
+        END IF;
+      END
+      $$;
+
+      SELECT format(
+        'ALTER ROLE workshop_user PASSWORD %L', :'db_password'
+      ) \gexec
+
+      SELECT 'CREATE DATABASE workshop_db OWNER workshop_user'
+      WHERE NOT EXISTS (
+        SELECT FROM pg_database WHERE datname = 'workshop_db'
+      ) \gexec
+      SQL
+
+      cat > /home/student/.config/dsi/database.env <<ENV
+      PGHOST=127.0.0.1
+      PGPORT=5432
+      PGDATABASE=workshop_db
+      PGUSER=workshop_user
+      PGPASSWORD=${DB_PASSWORD}
+      ENV
+
+      chown student:student /home/student/.config/dsi/database.env
+      chmod 0600 /home/student/.config/dsi/database.env
+
+      rm -f /etc/nginx/sites-enabled/default
+      ln -sfn /etc/nginx/sites-available/dsi-workshop \
+        /etc/nginx/sites-enabled/dsi-workshop
+
+      systemctl enable docker nginx postgresql shiny-server shinyproxy
+      systemctl start docker
+      systemctl restart postgresql shiny-server shinyproxy
+
+      test -d /home/student/.config/code-server
+      test -s /home/student/.config/code-server/config.yaml
+      grep -Fq 'password:' /home/student/.config/code-server/config.yaml
+      chown student:student /home/student/.config/code-server/config.yaml
+      chmod 0600 /home/student/.config/code-server/config.yaml
+      systemctl enable --now code-server@student
+
+      # Validate SSH configuration before applying it.
+      sshd -t
+
+      # Verify the effective authentication settings.
+      test "$(sshd -T | awk '/^passwordauthentication / {print $2; exit}')" = "no"
+      test "$(sshd -T | awk '/^kbdinteractiveauthentication / {print $2; exit}')" = "no"
+      test "$(sshd -T | awk '/^pubkeyauthentication / {print $2; exit}')" = "yes"
+      test "$(sshd -T | awk '/^permitrootlogin / {print $2; exit}')" = "without-password"
+
+      # Apply the validated SSH configuration without terminating existing sessions.
+      systemctl reload ssh
+
+      nginx -t
+      systemctl restart nginx
+
+      systemctl is-active --quiet docker
+      systemctl is-active --quiet postgresql
+      systemctl is-active --quiet shiny-server
+      systemctl is-active --quiet shinyproxy
+      systemctl is-active --quiet code-server@student
+      systemctl is-active --quiet nginx
+      systemctl is-active --quiet ssh
+      # optional: avoids participants doing it as part of the workshop
+      # systemctl enable --now dsi-fastapi
+      # systemctl is-active --quiet dsi-fastapi
+      # curl --fail --silent http://127.0.0.1:8000/ >/dev/null
+
+      sudo -u postgres psql -d workshop_db -c 'SELECT 1'
+      test "$(curl --fail --silent http://127.0.0.1/healthz)" = "ok"
+      curl --fail --silent --location http://127.0.0.1:8080/ >/dev/null
+      curl --fail --silent --location http://127.0.0.1:8081/ >/dev/null
+
+      touch /etc/dsi/provisioning-complete
+      rm -f /root/configure-participant.sh
+
+runcmd:
+  - [bash, /root/configure-participant.sh]
+
+final_message: "DSI participant __PARTICIPANT_ID__ configuration completed"
