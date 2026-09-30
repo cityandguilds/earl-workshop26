@@ -40,7 +40,7 @@ write_files:
       KbdInteractiveAuthentication no
       PubkeyAuthentication yes
       PermitRootLogin prohibit-password
-`
+
   - path: /etc/nginx/sites-available/dsi-workshop
     owner: root:root
     permissions: "0644"
@@ -214,8 +214,40 @@ write_files:
 
       sudo -u postgres psql -d workshop_db -c 'SELECT 1'
       test "$(curl --fail --silent http://127.0.0.1/healthz)" = "ok"
-      curl --fail --silent --location http://127.0.0.1:8080/ >/dev/null
-      curl --fail --silent --location http://127.0.0.1:8081/ >/dev/null
+
+      wait_for_service_http() {
+        local name=$1
+        local service=$2
+        local url=$3
+
+        for attempt in $(seq 1 60); do
+          if curl --fail --silent --location \
+              --output /dev/null "$url"; then
+            echo "${name} is ready"
+            return 0
+          fi
+
+          if ! systemctl is-active --quiet "$service"; then
+            echo "ERROR: ${service} stopped during startup" >&2
+            journalctl -u "$service" -n 100 --no-pager >&2
+            return 1
+          fi
+
+          sleep 2
+        done
+
+        echo "ERROR: ${name} readiness timeout" >&2
+        return 1
+      }
+      wait_for_service_http \
+        "code-server" \
+        "code-server@student" \
+        "http://127.0.0.1:8080/"
+
+      wait_for_service_http \
+        "ShinyProxy" \
+        "shinyproxy" \
+        "http://127.0.0.1:8081/"
 
       touch /etc/dsi/provisioning-complete
       rm -f /root/configure-participant.sh

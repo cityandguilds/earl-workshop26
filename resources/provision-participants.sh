@@ -2,6 +2,9 @@
 set -euo pipefail
 umask 077
 
+doctl auth init --context workshop
+doctl auth switch --context workshop
+
 # env
 require_command() {
   command -v "$1" >/dev/null || {
@@ -15,6 +18,8 @@ for command in \
 do
   require_command "$command"
 done
+
+cd resources/
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG_FILE="${1:-${SCRIPT_DIR}/workshop.env}"
@@ -131,8 +136,8 @@ done
 mkdir -p "$CONFIG_DIR"
 chmod 700 "$CONFIG_DIR"
 touch .gitignore
-if ! grep -Fxq "${CONFIG_DIR}/" .gitignore; then
-  printf '%s\n' "${CONFIG_DIR}/" >> .gitignore
+if ! grep -Fxq "${CONFIG_DIR}/" ../.gitignore; then
+  printf '%s\n' "${CONFIG_DIR}/" >> ../.gitignore
 fi
 
 if [[ ! -e "$ACCESS_FILE" ]]; then
@@ -143,8 +148,8 @@ fi
 chmod 600 "$ACCESS_FILE"
 
 if [ "$CREATE_DIGITALOCEAN_DNS" = true ]; then
-  if ! doctl compute domain list --format Name --no-header \
-      | grep -Fxq "$DOMAIN"; then
+  if ! doctl compute domain list --no-header \
+      | grep -Fq "$DOMAIN"; then
     echo "ERROR: ${DOMAIN} is not configured in DigitalOcean DNS."
     exit 1
   fi

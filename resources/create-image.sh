@@ -176,5 +176,8 @@ test -n "$SNAPSHOT_ID"
 echo "$SNAPSHOT_ID"
 
 # delete droplet
-doctl compute snapshot list --resource droplet
-doctl compute droplet delete dsi-image-builder
+doctl compute droplet list \
+  --format ID,Name,PublicIPv4,Status,Region
+BUILD_ID=$(doctl compute droplet list --format ID,Name --no-header \
+| awk -v name="$BUILD_DROPLET" '$2 == name {print $1; exit}')
+doctl compute droplet delete $BUILD_ID --force
