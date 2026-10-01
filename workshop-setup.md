@@ -593,29 +593,16 @@ sudo -n whoami
 - use `SELECT`, `WHERE`, `ORDER BY`, `GROUP BY`, and `JOIN`;
 - create a reusable view for Shiny.
 
-## Part 3: Shiny (20 min)
+## Part 3: Shiny (30 min)
 
-```r
-readRenviron("~/.config/dsi/database.env")
-
-library(DBI)
-con <- dbConnect(
-  RPostgres::Postgres(),
-  dbname = Sys.getenv("PGDATABASE"),
-  host = Sys.getenv("PGHOST"),
-  port = as.integer(Sys.getenv("PGPORT")),
-  user = Sys.getenv("PGUSER"),
-  password = Sys.getenv("PGPASSWORD")
-)
-```
-
-- Create myapp.
-- Deploy to `/srv/shiny-server/myapp`.
+- intro to open source Shiny Server
+- Clone a github repo.
+- Deploy shinyFlights to `/srv/shiny-server/shinyFlights`.
 - Deploy with Git/GitHub (public repo)
 - Browse (`Nginx` again):
 
 ```text
-https://dsi-01.earl.sjp-analytics.co.uk/shiny/myapp/
+https://dsi-01.earl.sjp-analytics.co.uk/shiny/shinyFlights/
 ```
 
 ## Part 4: FastAPI (20 min)

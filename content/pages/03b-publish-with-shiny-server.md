@@ -1,10 +1,10 @@
 ---
-id: deploy-shiny-flights
+id: shiny-server-deployment
 title: Deploy shinyFlights with Shiny Server
-slug: "deploy-shiny-flights"
+slug: "shiny-server-deployment"
 order: 210
 section: Shiny
-section_order: 150
+section_order: 210
 summary: "Deploy a Shiny application to Shiny Server and connect it to PostgreSQL"
 level: "Beginner"
 estimated_minutes: 30
@@ -85,7 +85,7 @@ Only Nginx is exposed as the public web entry point. Shiny Server and PostgreSQL
 On your **local computer**, download the public repository:
 
 ```bash
-git clone https://github.com/YOUR-GITHUB-USERNAME/shinyFlights.git
+git clone https://github.com/lizardburns/shinyFlights.git
 cd shinyFlights
 find . -maxdepth 2 -type f -print
 ```
@@ -126,7 +126,7 @@ Clone the project into your home directory for testing:
 ```bash
 cd ~
 rm -rf shinyFlights-test
-git clone https://github.com/YOUR-GITHUB-USERNAME/shinyFlights.git \
+git clone https://github.com/lizardburns/shinyFlights.git \
   shinyFlights-test
 cd shinyFlights-test
 ```
@@ -175,6 +175,22 @@ sudo find /srv/shiny-server/shinyFlights -type d -exec chmod 0755 {} \;
 sudo find /srv/shiny-server/shinyFlights -type f -exec chmod 0644 {} \;
 ```
 
+Because the app project (package) uses {renv} to manage R dependencies - **recommended** - we need to do a little work to ensure the environment is set up correctly.
+
+```bash
+sudo su - shiny
+cd /srv/shiny-server/shinyFlights
+R
+```
+
+```R
+# if your package has dependencies on packages installed from private GitHub 
+# repos, you may need to authenticate, e.g.
+# Sys.setenv(GITHUB_PAT="your_pat")
+renv::status()
+renv::restore()
+```
+
 This simulates deploying one of your own projects from your laptop to a server.
 
 ## 17 to 22 minutes: provide database configuration safely
@@ -202,20 +218,6 @@ An exit value of `0` means the `shiny` account can read the file.
 > Never add `database.env` to Git or copy it into `/srv/shiny-server/shinyFlights`.
 
 ## 22 to 25 minutes: validate the deployed app
-
-Check that the required packages load as the service account:
-
-```bash
-sudo -u shiny Rscript --vanilla -e \
-  'library(shiny); library(DBI); library(RPostgres)'
-```
-
-Restart Shiny Server:
-
-```bash
-sudo systemctl restart shiny-server
-sudo systemctl is-active shiny-server
-```
 
 Test Shiny Server locally:
 
@@ -246,10 +248,22 @@ Now replace the copied deployment with a clone from the public repository:
 ```bash
 sudo rm -rf /srv/shiny-server/shinyFlights
 sudo git clone \
-  https://github.com/YOUR-GITHUB-USERNAME/shinyFlights.git \
+  https://github.com/lizardburns/shinyFlights.git \
   /srv/shiny-server/shinyFlights
 sudo chown -R shiny:shiny /srv/shiny-server/shinyFlights
-sudo systemctl restart shiny-server
+sudo su - shiny
+cd /srv/shiny-server/shinyFlights
+R
+```
+
+Restore your R environment:
+
+```R
+# if your package has dependencies on packages installed from private GitHub 
+# repos, you may need to authenticate, e.g.
+# Sys.setenv(GITHUB_PAT="your_pat")
+renv::status()
+renv::restore()
 ```
 
 This illustrates a simple Git-based deployment. The repository provides versioned application code, while the VM provides its own database configuration.
@@ -257,12 +271,36 @@ This illustrates a simple Git-based deployment. The repository provides versione
 For a later update:
 
 ```bash
+sudo su - shiny
 cd /srv/shiny-server/shinyFlights
-sudo -u shiny git pull --ff-only
-sudo systemctl restart shiny-server
+git status
+git fetch origin
+# if you've got any uncommitted files in your working directory on the server  
+# that you want to keep, e.g. .env files, you might want to think about other  
+# ways to manage that but right now you're going to need to stash them before 
+# you pull
+# git stash
+git pull --ff-only
+git stash origin
+git status
+R
 ```
 
-A production deployment would normally pin and test a particular release or commit rather than automatically use whatever happens to be newest.
+Always check if there's been any update to your dependencies so you can stay in sync.
+
+```R
+# if your package has dependencies on packages installed from private GitHub 
+# repos, you may need to authenticate, e.g.
+# Sys.setenv(GITHUB_PAT="your_pat")
+renv::status()
+# renv::restore()
+```
+
+Restart application process for changes to take effect:
+
+```bash
+touch restart.txt
+```
 
 ## 28 to 30 minutes: browse through Nginx
 
@@ -306,7 +344,7 @@ For the Git route:
 
 1. commit and push the change to your own public fork;
 2. run `git pull --ff-only` in the deployed directory;
-3. restart Shiny Server;
+3. restart the application;
 4. reload the application.
 
 This demonstrates the path from source change to deployed application.
