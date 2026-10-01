@@ -535,6 +535,25 @@ for port in 3838 5432 8000 8080 8081; do
 done
 ```
 
+### Test quarto
+```bash
+sudo -u student which quarto
+sudo -u student quarto check
+sudo -u student bash <<'EOF'
+mkdir -p /tmp/quarto-test
+cd /tmp/quarto-test
+
+quarto create-project test
+cd test
+
+quarto render
+EOF
+
+sudo -u shiny quarto check
+sudo -u shiny quarto render example.qmd
+sudo -u student quarto render example.qmd
+```
+
 # Workshop outline
 
 ## Part 1: Infrastructure (30 min)

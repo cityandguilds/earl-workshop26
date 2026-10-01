@@ -58,7 +58,17 @@ install -d -m 0755 /etc/dsi
 log "Installing R packages"
 Rscript --vanilla -e \
   "install.packages(
-    c('shiny', 'RPostgres', 'DBI', 'httr', 'jsonlite'),
+    c(
+      "shiny",
+      "RPostgres",
+      "DBI",
+      "httr",
+      "jsonlite",
+      "knitr",
+      "rmarkdown",
+      "quarto",
+      "ggplot2"
+    ),
     repos='https://cloud.r-project.org',
     Ncpus=1
   )"
