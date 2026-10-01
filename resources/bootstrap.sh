@@ -341,7 +341,9 @@ for attempt in $(seq 1 30); do
   sleep 2
 done
 
-systemctl enable nginx dsi-fastapi certbot.timer
+systemctl enable nginx certbot.timer
+systemctl disable dsi-fastapi
+systemctl reset-failed dsi-fastapi || true
 systemctl restart postgresql nginx
 
 test "$(curl --fail --silent http://127.0.0.1:3838/ |
