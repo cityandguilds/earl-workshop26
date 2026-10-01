@@ -185,14 +185,34 @@ write_files:
       chmod 0600 /home/student/.config/code-server/config.yaml
       systemctl enable --now code-server@student
 
-      # Validate SSH configuration before applying it.
-      sshd -t
+      # Validate SSH configuration.
+      install -d -o root -g root -m 0755 /run/sshd
+      /usr/sbin/sshd -t
 
-      # Verify the effective authentication settings.
-      test "$(sshd -T | awk '/^passwordauthentication / {print $2; exit}')" = "no"
-      test "$(sshd -T | awk '/^kbdinteractiveauthentication / {print $2; exit}')" = "no"
-      test "$(sshd -T | awk '/^pubkeyauthentication / {print $2; exit}')" = "yes"
-      test "$(sshd -T | awk '/^permitrootlogin / {print $2; exit}')" = "without-password"
+      # Verify effective authentication settings.
+      SSHD_CONFIG=$(/usr/sbin/sshd -T)
+
+      test "$(awk '/^passwordauthentication / {print $2; exit}' \
+        <<<"$SSHD_CONFIG")" = "no"
+
+      test "$(awk '/^kbdinteractiveauthentication / {print $2; exit}' \
+        <<<"$SSHD_CONFIG")" = "no"
+
+      test "$(awk '/^pubkeyauthentication / {print $2; exit}' \
+        <<<"$SSHD_CONFIG")" = "yes"
+
+      root_login=$(
+        awk '/^permitrootlogin / {print $2; exit}' <<<"$SSHD_CONFIG"
+      )
+
+      case "$root_login" in
+        prohibit-password|without-password)
+          ;;
+        *)
+          echo "Unexpected PermitRootLogin value: $root_login" >&2
+          exit 1
+          ;;
+      esac
 
       # Apply the validated SSH configuration without terminating existing sessions.
       systemctl reload ssh
