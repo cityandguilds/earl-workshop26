@@ -137,7 +137,7 @@ mkdir -p "$CONFIG_DIR"
 chmod 700 "$CONFIG_DIR"
 touch .gitignore
 if ! grep -Fxq "${CONFIG_DIR}/" ../.gitignore; then
-  printf '%s\n' "${CONFIG_DIR}/" >> ../.gitignore
+  printf '%s/\n' "$(basename "$CONFIG_DIR")" >> ../.gitignore
 fi
 
 if [[ ! -e "$ACCESS_FILE" ]]; then
