@@ -558,10 +558,21 @@ sudo -u student quarto render example.qmd
 
 ## Part 1: Infrastructure (30 min)
 
-- Explain Projects, VPCs, tags, Cloud Firewalls, Droplets, snapshots, DNS, Nginx, HTTPS, and cloud-init.
+### cloud commputing
+- Explain DigitalOcean Projects, VPCs, tags, Cloud Firewalls, Droplets, snapshots, DNS, Nginx, HTTPS, and cloud-init.
+- Make Azure comparison
+- Make AWS comparison
 - Explain network configuration and HTTPS.
 - Show why only ports 22, 80, and 443 are public. `nginx`
-- Connect with the supplied key:
+
+### Linux
+Explain why we use Linux distributions as OS for virtual machines running open source data software.
+
+### nix primer
+Explain unix and give an intro to basic commands that workshop participants will need to navigate the file system, move and copy files, scp, and do basic system monitoring.
+
+### Demo
+Connect with the supplied key:
 
 ```bash
 ssh -i dsi-01-ssh student@dsi-01.earl.sjp-analytics.co.uk

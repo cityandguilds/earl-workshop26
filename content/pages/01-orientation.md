@@ -1,9 +1,13 @@
 ---
 id: orientation
 title: Welcome and workshop map
+slug: "orientation"
 order: 10
 section: Getting started
 section_order: 10
+summary: "Welcome and overview of workshop"
+level: "Beginner"
+estimated_minutes: 10
 resources:
   - file: examples/hello.txt
     label: Workshop example note
