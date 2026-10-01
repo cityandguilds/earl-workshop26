@@ -365,11 +365,14 @@ dbExecute(con, "CREATE SCHEMA IF NOT EXISTS flights")
 > Never print, publish, or commit the contents of `database.env`.
 
 ## 5 to 12 minutes: download and inspect the data
+```bash
+R
+```
 
 ```r
 dir.create("~/openflights", showWarnings = FALSE)
 setwd("~/openflights")
-base_url <- "https://raw.githubusercontent.com/jpatokal/openflights/master/data"
+base_url <- "https://raw.githubusercontent.com/lizardburns/shinyFlights/refs/heads/master/inst/extdata"
 
 for (filename in c("airports.dat", "airlines.dat", "routes.dat")) {
   download.file(paste0(base_url, "/", filename), filename, mode = "wb")
@@ -552,7 +555,7 @@ dbGetQuery(con, "
 ")
 ```
 
-The later Shiny app can offer an airport selector, destination table, airline filter, route chart, and map.
+Then, later, our Shiny app can offer an airport selector, destination table, airline filter, route chart, and map.
 
 ```r
 dbDisconnect(con)
