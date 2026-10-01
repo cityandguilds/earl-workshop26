@@ -586,7 +586,12 @@ sudo -n whoami
 
 ## Part 2: PostgreSQL
 
-Teaching databasing - free relational data.
+- explain tables, rows, primary keys, foreign keys, views and schemas;
+- connect to PostgreSQL from R;
+- download tabular data to your VM;
+- write data frames into the `flights` schema;
+- use `SELECT`, `WHERE`, `ORDER BY`, `GROUP BY`, and `JOIN`;
+- create a reusable view for Shiny.
 
 ## Part 3: Shiny (20 min)
 
