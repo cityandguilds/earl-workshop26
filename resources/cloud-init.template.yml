@@ -170,6 +170,30 @@ write_files:
       chown student:student /home/student/.config/dsi/database.env
       chmod 0600 /home/student/.config/dsi/database.env
 
+      # Give each application service its own private copy of the participant's
+      # database settings. The shiny account is created by Shiny Server during
+      # golden-image creation; fastapi is created by bootstrap.sh.
+      SHINY_HOME=$(getent passwd shiny | cut -d: -f6)
+      test -n "$SHINY_HOME"
+
+      install -d -o shiny -g shiny -m 0700 \
+        "$SHINY_HOME/.config" \
+        "$SHINY_HOME/.config/dsi"
+      install -o shiny -g shiny -m 0600 \
+        /home/student/.config/dsi/database.env \
+        "$SHINY_HOME/.config/dsi/database.env"
+
+      install -d -o fastapi -g fastapi -m 0700 \
+        /home/fastapi/.config \
+        /home/fastapi/.config/dsi
+      install -o fastapi -g fastapi -m 0600 \
+        /home/student/.config/dsi/database.env \
+        /home/fastapi/.config/dsi/database.env
+
+      sudo -u student test -r /home/student/.config/dsi/database.env
+      sudo -u shiny test -r "$SHINY_HOME/.config/dsi/database.env"
+      sudo -u fastapi test -r /home/fastapi/.config/dsi/database.env
+
       rm -f /etc/nginx/sites-enabled/default
       ln -sfn /etc/nginx/sites-available/dsi-workshop \
         /etc/nginx/sites-enabled/dsi-workshop
