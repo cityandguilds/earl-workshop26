@@ -2,6 +2,10 @@
 
 {% block title %}{{ page.title }} · {{ workshop.title }}{% endblock %}
 
+{% block extra_head %}
+<link rel="stylesheet" href="/static/code-highlight.css">
+{% endblock %}
+
 {% block content %}
 <nav class="breadcrumbs" aria-label="Breadcrumb">
   <a href="/">Home</a>
@@ -55,3 +59,5 @@
   {% if next_page %}<a class="button" href="/course/{{ next_page.id }}">{{ next_page.title }} →</a>{% endif %}
 </nav>
 {% endblock %}
+
+{% block scripts %}<script src="/static/course.js" defer></script>{% endblock %}

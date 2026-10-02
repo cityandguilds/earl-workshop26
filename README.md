@@ -82,6 +82,10 @@ The authoring contract is:
   contain a non-empty `label`. Paths are normalized to `/`, cannot be absolute, and cannot
   contain `..` segments. A resource is visible on a page only when that page declares it.
 - The body is rendered as Markdown with fenced-code and table support. Raw HTML is escaped.
+  Declare a code-fence language (for example, `bash`, `python`, `r`, `sql`, or `yaml`) for
+  syntax highlighting. Quarto `{r}` fences are also highlighted as R. Unknown or omitted
+  languages use plain code. Each code block has a Copy button; when clipboard access is
+  unavailable, the code is selected for manual copying. Highlighting assets are served locally.
 
 Changing front matter or adding/removing Markdown files changes the current course sequence when
 the application restarts; no Python route edits are required.

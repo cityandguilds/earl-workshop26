@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 from cryptography.fernet import Fernet
@@ -130,7 +131,9 @@ def test_course_page_is_rendered_from_loaded_content(tmp_path: Path) -> None:
     assert response.status_code == 200
     assert "Install software on a virtual machine" in response.text
     assert "<h2>What you will learn</h2>" in response.text
-    assert "sudo apt update" in response.text
+    assert "sudo apt update" in re.sub(r"<[^>]+>", "", response.text)
+    assert 'href="/static/code-highlight.css"' in response.text
+    assert 'src="/static/course.js"' in response.text
     assert client.get("/course/not-a-page").status_code == 404
 
 

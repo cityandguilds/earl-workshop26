@@ -1,3 +1,5 @@
+import re
+from html import unescape
 from pathlib import Path
 
 import pytest
@@ -139,6 +141,75 @@ def test_raw_html_is_escaped_but_markdown_is_rendered() -> None:
     assert "<script>" not in rendered
     assert "&lt;script&gt;alert('x')&lt;/script&gt;" in rendered
     assert "<strong>safe Markdown</strong>" in rendered
+
+
+@pytest.mark.parametrize(
+    "language",
+    [
+        "bash",
+        "python",
+        "r",
+        "R",
+        "{r}",
+        "sql",
+        "yaml",
+        "dockerfile",
+        "nginx",
+        "json",
+        "ini",
+        "powershell",
+    ],
+)
+def test_code_highlighting_preserves_code_text(language: str) -> None:
+    code = 'value < 2 & "example"\n    indented_value\n'
+    rendered = render_markdown(f"```{language}\n{code}```")
+
+    assert '<span class="' in rendered
+    code_html = re.search(r"<code[^>]*>(.*?)</code>", rendered, re.DOTALL)
+    assert code_html is not None
+    assert unescape(re.sub(r"<[^>]+>", "", code_html.group(1))) == code
+
+
+@pytest.mark.parametrize("language", ["", "text", "not-a-language"])
+def test_plain_code_is_not_guessed_or_rendered_as_html(language: str) -> None:
+    rendered = render_markdown(f"```{language}\n<script>alert('x')</script>\n```")
+
+    assert '<span class="' not in rendered
+    assert "<script>" not in rendered
+    assert "&lt;script&gt;" in rendered
+
+
+def test_markdown_renders_headings_lists_tables_and_quotes() -> None:
+    rendered = render_markdown(
+        "## Heading\n\n- **Bold** and `inline code`\n\n> A quote\n\n"
+        "| Name | Value |\n| --- | --- |\n| Example | 42 |"
+    )
+    for markup in [
+        "<h2>Heading</h2>",
+        "<ul>",
+        "<strong>Bold</strong>",
+        "<code>inline code</code>",
+        "<blockquote>",
+        "<table>",
+        "<td>42</td>",
+    ]:
+        assert markup in rendered
+
+
+def test_quarto_fence_normalisation_does_not_change_nested_example() -> None:
+    rendered = render_markdown("````text\n```{r}\nx <- 1\n```\n````")
+    assert "```{r}" in rendered
+
+
+def test_blockquotes_keep_html_escaped() -> None:
+    rendered = render_markdown(
+        "> **Note:** <script>alert('x')</script>\n\n> > Nested quote\n\n&gt; literal"
+    )
+    assert "<script>" not in rendered
+    assert "&lt;script&gt;" in rendered
+    assert "<strong>Note:</strong>" in rendered
+    assert rendered.count("<blockquote>") == 2
+    assert "<p>&gt; literal</p>" in rendered
 
 
 def test_page_order_changes_without_route_changes(tmp_path: Path) -> None:
