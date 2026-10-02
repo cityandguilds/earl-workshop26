@@ -605,7 +605,7 @@ sudo -n whoami
 https://dsi-01.earl.sjp-analytics.co.uk/shiny/shinyFlights/
 ```
 
-## Part 4: FastAPI (20 min)
+## Part 4: FastAPI (30 min)
 
 FastAPI is not enabled or started. /api/ will initially return 502 Bad Gateway.
 
@@ -624,10 +624,12 @@ https://dsi-01.earl.sjp-analytics.co.uk/api/docs
 
 ## Part 5: Quarto (20 min)
 
-- Create a Quarto report.
+- introduce quarto
+- Create a Quarto report using the flights data
 - Query PostgreSQL data.
 - Render to HTML.
-- Publish through Nginx or retrieve it with SCP.
+- Publish through Nginx 
+- retrieve it with SCP.
 
 ## Part 6: Docker and ShinyProxy (30 min)
 
