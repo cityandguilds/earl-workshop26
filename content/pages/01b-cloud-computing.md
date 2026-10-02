@@ -10,8 +10,6 @@ level: "Beginner"
 estimated_minutes: 15
 ---
 
-# Cloud computing for this workshop
-
 ## What you will learn
 
 By the end of this page, you should be able to:
@@ -193,7 +191,7 @@ What it means:
 - FastAPI does not need a public listening port.
 
 ## Try it: SSH
-SSH, or Secure Shell, lets you open an encrypted command-line session on another computer, such as your workshop virtual machine.  
+SSH, or Secure Shell, lets you open an encrypted command-line session on another computer, such as your workshop virtual machine.
 
 ```text
 Your laptop  -- encrypted SSH connection -->  Workshop VM

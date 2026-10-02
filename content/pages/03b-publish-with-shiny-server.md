@@ -10,8 +10,6 @@ level: "Beginner"
 estimated_minutes: 30
 ---
 
-# Deploy shinyFlights
-
 ## Session goal
 
 In this session you will deploy an existing Shiny application instead of writing one from scratch.
@@ -184,7 +182,7 @@ R
 ```
 
 ```R
-# if your package has dependencies on packages installed from private GitHub 
+# if your package has dependencies on packages installed from private GitHub
 # repos, you may need to authenticate, e.g.
 # Sys.setenv(GITHUB_PAT="your_pat")
 renv::status()
@@ -259,7 +257,7 @@ R
 Restore your R environment:
 
 ```R
-# if your package has dependencies on packages installed from private GitHub 
+# if your package has dependencies on packages installed from private GitHub
 # repos, you may need to authenticate, e.g.
 # Sys.setenv(GITHUB_PAT="your_pat")
 renv::status()
@@ -275,9 +273,9 @@ sudo su - shiny
 cd /srv/shiny-server/shinyFlights
 git status
 git fetch origin
-# if you've got any uncommitted files in your working directory on the server  
-# that you want to keep, e.g. .env files, you might want to think about other  
-# ways to manage that but right now you're going to need to stash them before 
+# if you've got any uncommitted files in your working directory on the server
+# that you want to keep, e.g. .env files, you might want to think about other
+# ways to manage that but right now you're going to need to stash them before
 # you pull
 # git stash
 git pull --ff-only
@@ -289,7 +287,7 @@ R
 Always check if there's been any update to your dependencies so you can stay in sync.
 
 ```R
-# if your package has dependencies on packages installed from private GitHub 
+# if your package has dependencies on packages installed from private GitHub
 # repos, you may need to authenticate, e.g.
 # Sys.setenv(GITHUB_PAT="your_pat")
 renv::status()

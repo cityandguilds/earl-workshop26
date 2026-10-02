@@ -10,8 +10,6 @@ level: "Beginner"
 estimated_minutes: 10
 ---
 
-# Welcome, introductions and workshop overview
-
 Welcome to the workshop. Today you will work through a small, connected data platform on your own Linux virtual machine, using one flights dataset across databases, applications, APIs, reports, and containers.
 
 ## Who are we?

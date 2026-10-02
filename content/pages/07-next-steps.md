@@ -10,8 +10,6 @@ level: "Beginner"
 estimated_minutes: 10
 ---
 
-# Next steps
-
 You have followed one flights dataset from a cloud virtual machine into PostgreSQL, Shiny, FastAPI, Quarto, Docker, and ShinyProxy. The next step is to repeat selected parts independently, change them, and make the environment your own.
 
 ## Keep the repository

@@ -10,8 +10,6 @@ level: "Beginner"
 estimated_minutes: 15
 ---
 
-# Introduction to ShinyProxy
-
 ## What you will learn
 
 By the end of this page, you should be able to:
@@ -130,7 +128,7 @@ An application then needs a specification in the `proxy.specs` section of `appli
 
 - `id`, used as the application identifier and in its URL;
 - `container-image`, identifying the Docker image;
-- `port`, when the application does not use Shiny's default container port of `3838`. 
+- `port`, when the application does not use Shiny's default container port of `3838`.
 
 A small example is:
 

@@ -10,8 +10,6 @@ level: "Beginner"
 estimated_minutes: 5
 ---
 
-# Why Linux for open source data software?
-
 ## What you will learn
 
 By the end of this page, you should be able to:

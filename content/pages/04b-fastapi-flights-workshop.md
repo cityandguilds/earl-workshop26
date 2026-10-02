@@ -10,8 +10,6 @@ level: "Beginner"
 estimated_minutes: 30
 ---
 
-# Publish flights data with FastAPI
-
 ## Session goal
 
 In this session you will enable a prepared FastAPI service that exposes read-only endpoints for data in `flights.route_details`.

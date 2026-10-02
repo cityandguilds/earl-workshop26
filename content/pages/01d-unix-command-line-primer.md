@@ -10,8 +10,6 @@ level: "Beginner"
 estimated_minutes: 15
 ---
 
-# Unix command-line primer
-
 ## What you will learn
 
 By the end of this page, you should be able to:

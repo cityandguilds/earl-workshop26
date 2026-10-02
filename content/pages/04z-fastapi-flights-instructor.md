@@ -10,8 +10,6 @@ level: "Instructor"
 estimated_minutes: 30
 ---
 
-# Instructor notes: Flights API
-
 ## Intended starting state
 
 Before participants begin:

@@ -10,8 +10,6 @@ level: "Beginner"
 estimated_minutes: 15
 ---
 
-# Introduction to Shiny Server
-
 ## What you will learn
 
 By the end of this page, you should be able to:

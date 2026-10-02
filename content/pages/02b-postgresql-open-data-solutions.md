@@ -10,8 +10,6 @@ level: "Beginner"
 estimated_minutes: 10
 ---
 
-# Exercise solutions
-
 ## Exercise 1
 
 1. One row represents one airport, airline, or route.

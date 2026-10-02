@@ -10,8 +10,6 @@ level: "Beginner"
 estimated_minutes: 30
 ---
 
-# PostgreSQL with open relational data
-
 ## Session goal
 
 In this session you will download three related OpenFlights datasets, write them to a PostgreSQL schema called `flights`, and query them with SQL. The tables will also support a later Shiny application.

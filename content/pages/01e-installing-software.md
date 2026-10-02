@@ -10,8 +10,6 @@ level: "Beginner"
 estimated_minutes: 10
 ---
 
-# Install software on a virtual machine
-
 ## What you will learn
 
 By the end of this page, you should be able to:

@@ -10,8 +10,6 @@ level: "Beginner"
 estimated_minutes: 20
 ---
 
-# Publish a flights report with Quarto
-
 ## Session goal
 
 In this activity you will create a reproducible report from the flights data stored in PostgreSQL. You will render the report as HTML, publish it through Nginx, and retrieve a copy on your own computer using SCP.

@@ -10,8 +10,6 @@ level: "Beginner"
 estimated_minutes: 15
 ---
 
-# Containers and an introduction to Docker
-
 ## Session goal
 
 This page introduces containers and the main Docker concepts needed for the final workshop activity. You will inspect the Docker installation, run a small container, and learn how application source code becomes a reusable container image.
