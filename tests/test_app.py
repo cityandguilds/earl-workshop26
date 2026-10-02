@@ -104,7 +104,7 @@ def test_course_page_is_rendered_from_loaded_content(tmp_path: Path) -> None:
     )
     client = TestClient(create_app(settings))
 
-    assert client.get("/course/runtime").status_code == 401
+    assert client.get("/course/install-software").status_code == 401
     with client.app.state.session_factory() as session:
         create_user(
             session,
@@ -125,11 +125,12 @@ def test_course_page_is_rendered_from_loaded_content(tmp_path: Path) -> None:
     )
     assert login.status_code == 303
 
-    response = client.get("/course/runtime")
+    response = client.get("/course/install-software")
 
     assert response.status_code == 200
-    assert "Set up the application runtime" in response.text
-    assert "echo &quot;hello from the workshop&quot;" in response.text
+    assert "Install software on a virtual machine" in response.text
+    assert "<h2>What you will learn</h2>" in response.text
+    assert "sudo apt update" in response.text
     assert client.get("/course/not-a-page").status_code == 404
 
 

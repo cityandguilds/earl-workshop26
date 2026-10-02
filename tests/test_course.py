@@ -30,34 +30,39 @@ Body for {page_id}.
 """
 
 
-def test_course_skeleton_loads_in_deterministic_order() -> None:
+def test_workshop_content_loads_in_deterministic_order() -> None:
     workshop = load_workshop(Path("content"))
 
     assert [course_page.id for course_page in workshop.pages] == [
         "orientation",
-        "access-workshop-vm",
-        "bash-primer",
+        "cloud-computing",
+        "linux",
+        "unix",
         "install-software",
-        "runtime",
-        "containers",
-        "postgresql",
-        "deployment-options",
-        "prepare-for-deployment",
-        "serve-shiny-app",
-        "serve-quarto-document",
-        "serve-fastapi-app",
+        "postgresql-open-data",
+        "postgresql-open-data-solutions",
+        "shiny-server-introduction",
+        "shiny-server-deployment",
+        "containers-docker-introduction",
+        "shinyproxy-introduction",
+        "fastapi-introduction",
+        "fastapi-flights",
+        "quarto-flights-report",
         "next-steps",
+        "postgresql-open-data-instructor",
+        "fastapi-flights-instructor",
     ]
-    assert [section.name for section in workshop.sections] == [
+    assert list(dict.fromkeys(section.name for section in workshop.sections)) == [
         "Getting started",
-        "Application setup",
-        "Data services",
-        "Deployment choices",
-        "Serving applications",
-        "Operations and next steps",
+        "PostgreSQL",
+        "Shiny",
+        "Docker and ShinyProxy",
+        "FastAPI",
+        "Quarto",
+        "Next steps",
+        "Instructor resources",
     ]
-    assert workshop.pages[0].resources[0].file == "examples/hello.txt"
-    assert "<h2>To be authored</h2>" in workshop.pages[0].html
+    assert "<h2>Workshop learning outcomes</h2>" in workshop.pages[0].html
 
 
 def test_duplicate_stable_ids_fail_with_both_paths(tmp_path: Path) -> None:

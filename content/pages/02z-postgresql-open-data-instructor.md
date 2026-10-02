@@ -1,6 +1,6 @@
 ---
 id: postgresql-open-data-instructor
-title: Instructor notes: PostgreSQL with OpenFlights
+title: "Instructor notes: PostgreSQL with OpenFlights"
 slug: "postgresql-open-data-instructor"
 order: 900
 section: Instructor resources
