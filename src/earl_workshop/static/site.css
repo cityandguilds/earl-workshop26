@@ -24,6 +24,8 @@ a { color: inherit; }
 
 .header-inner, .footer-inner { display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; min-height: 4.7rem; }
 
+.header-inner { flex-wrap: wrap; padding: 0.8rem 0; }
+
 .brand { display: inline-flex; align-items: center; gap: 0.8rem; color: var(--white); text-decoration: none; }
 
 .brand-mark { width: 3.5rem; height: 3.5rem; object-fit: contain; background: var(--white); border-radius: 0.15rem; }
@@ -34,11 +36,11 @@ a { color: inherit; }
 
 .header-kicker { color: #D9DDDF; font-size: 0.82rem; letter-spacing: 0.04em; }
 
-.header-account { display: flex; align-items: center; gap: 0.75rem; }
+.header-account { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; min-width: 0; max-width: 100%; }
 
 .header-account form { margin: 0; }
 
-.header-user { color: #D9DDDF; font-size: 0.85rem; }
+.header-user { max-width: 12rem; color: #D9DDDF; font-size: 0.85rem; overflow-wrap: anywhere; }
 
 .header-link { color: var(--white); font-size: 0.85rem; font-weight: 700; }
 

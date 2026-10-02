@@ -22,6 +22,7 @@
           <a class="header-link" href="/learn-more">Learn more</a>
           {% if current_user %}
           <a class="header-link" href="/course">Course</a>
+          {% if current_user.role == 'attendee' %}<a class="button secondary" href="/attendee">Get credentials</a>{% endif %}
           {% if current_user.role == 'admin' %}<a class="header-link" href="/admin">Admin</a>{% endif %}
           <span class="header-user">{{ current_user.username }}</span>
           <form method="post" action="/logout">

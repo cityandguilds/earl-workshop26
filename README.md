@@ -170,6 +170,12 @@ The command prompts for a username, password, and confirmation. Portal roles are
 
 An attendee signs in with their unique username, not their optional display name. The display name is for presentation in the administrator area and is not unique enough to authenticate with.
 
+Attendees normally land on `/course` after signing in; a course page selected before sign-in
+takes precedence. The attendee header includes **Get credentials**, which opens `/attendee`.
+From there, **View VM credentials** reveals the assigned connection details. The SSH password
+stays hidden and is fetched only when the attendee chooses to copy it. Administrators retain
+their existing navigation and login destination.
+
 Portal account passwords are stored only as one-way Argon2 password hashes. They are not logged or returned by the application. VM passwords are a different credential type: they must be recoverable for the assigned attendee, so they are encrypted with `EARL_WORKSHOP_VM_ENCRYPTION_KEY` before being stored in the `vm_credentials.encrypted_password` field and decrypted only for that attendee's dashboard. The `vm_credentials` model stores the host and SSH username alongside that ciphertext; `vm_assignments` links a credential to an attendee and tracks whether it is active, with database uniqueness allowing at most one active VM per attendee and one active attendee per VM. Assignment lookup uses the authenticated session identity and never accepts an attendee-supplied record ID. An attendee without an active assignment sees a waiting state.
 
 ## Administrator operations

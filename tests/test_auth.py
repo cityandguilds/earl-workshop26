@@ -140,6 +140,34 @@ def test_login_logout_and_signed_cookie_configuration(tmp_path: Path) -> None:
     assert client.get("/admin").status_code == 401
 
 
+@pytest.mark.parametrize(
+    ("role", "destination"), [(UserRole.ATTENDEE, "/course"), (UserRole.ADMIN, "/")]
+)
+def test_default_login_destination_and_role_specific_header(
+    tmp_path: Path, role: UserRole, destination: str
+) -> None:
+    app = create_app(settings_for(tmp_path))
+    add_user(app, username="user", password="user password", role=role)
+    client = TestClient(app, follow_redirects=False)
+    assert "Get credentials" not in client.get("/").text
+    form = client.get("/login")
+    response = client.post(
+        "/login",
+        data={"username": "user", "password": "user password", "csrf_token": csrf_from(form)},
+    )
+    assert response.status_code == 303
+    assert response.headers["location"] == destination
+    for path in ("/", "/course", "/course/orientation", "/learn-more"):
+        page = client.get(path)
+        assert page.status_code == 200
+        if role == UserRole.ATTENDEE:
+            assert 'href="/attendee">Get credentials</a>' in page.text
+            assert 'href="/admin"' not in page.text
+        else:
+            assert "Get credentials" not in page.text
+            assert 'href="/admin"' in page.text
+
+
 def test_login_rejects_external_and_malformed_return_destinations(tmp_path: Path) -> None:
     app = create_app(settings_for(tmp_path))
     add_user(app, username="admin", password="admin password", role=UserRole.ADMIN)

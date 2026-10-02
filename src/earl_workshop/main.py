@@ -420,7 +420,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         establish_session(request, db, user)
         destination = _safe_next_path(next_path)
         if destination == "/" and user.role == UserRole.ATTENDEE.value:
-            destination = "/attendee"
+            destination = "/course"
         return RedirectResponse(url=destination, status_code=status.HTTP_303_SEE_OTHER)
 
     @app.post("/logout")
