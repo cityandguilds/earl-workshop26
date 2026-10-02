@@ -2,9 +2,9 @@
 id: shinyproxy-introduction
 title: Introduction to ShinyProxy
 slug: "shinyproxy-introduction"
-order: 230
+order: 510
 section: Docker and ShinyProxy
-section_order: 230
+section_order: 510
 summary: "Understand what ShinyProxy is, how it launches containerised applications, and when to use it"
 level: "Beginner"
 estimated_minutes: 15
