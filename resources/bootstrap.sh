@@ -43,15 +43,29 @@ apt-get install -y \
   openjdk-21-jdk r-base r-base-dev \
   certbot python3-certbot-nginx
 
-# Create persistent participant account
-log "Creating the persistent workshop account"
+# Create persistent participant and FastAPI service accounts
+log "Creating workshop accounts"
 if ! id student >/dev/null 2>&1; then
   useradd --create-home --shell /bin/bash student
+fi
+
+# FastAPI runs as a dedicated, non-interactive system account. A home directory
+# is required because cloud-init later installs its database.env below
+# /home/fastapi/.config/dsi.
+if ! id fastapi >/dev/null 2>&1; then
+  useradd \
+    --system \
+    --create-home \
+    --home-dir /home/fastapi \
+    --shell /usr/sbin/nologin \
+    fastapi
 fi
 
 install -d -o student -g student -m 0700 /home/student/.config
 install -d -o student -g student -m 0700 /home/student/.config/code-server
 install -d -o student -g student -m 0700 /home/student/.config/dsi
+install -d -o fastapi -g fastapi -m 0700 /home/fastapi/.config
+install -d -o fastapi -g fastapi -m 0700 /home/fastapi/.config/dsi
 install -d -m 0755 /etc/dsi
 
 # Install R packages
@@ -116,22 +130,25 @@ python3 -m venv /opt/dsi-fastapi-venv
 /opt/dsi-fastapi-venv/bin/pip install \
   fastapi uvicorn sqlalchemy psycopg2-binary pandas
 
-# systemd service runs main.py as student listening on 127.0.0.1
-# loads PostgreSQL credentials created later by cloud-init (leading `-` tells systemd 
-# not to fail merely because the file is initially absent)
-# golden-image script does not create /home/student/fastapi or main.py. Participants 
-# create the application during the workshop. Until then, the service cannot start successfully.
+# Prepare the application directory. Participants add the FastAPI code during
+# the workshop; root owns the deployment and the fastapi group can read it.
+install -d -o root -g fastapi -m 0750 /opt/dsi-fastapi
+
+# systemd runs Uvicorn as the dedicated fastapi account on 127.0.0.1.
+# cloud-init later installs PostgreSQL credentials at
+# /home/fastapi/.config/dsi/database.env. The leading `-` tells systemd not
+# to fail merely because the file is absent in the golden image.
 cat > /etc/systemd/system/dsi-fastapi.service <<'UNIT'
 [Unit]
 Description=DSI Workshop FastAPI
 After=network.target postgresql.service
 
 [Service]
-User=student
-Group=student
-WorkingDirectory=/home/student/fastapi
-EnvironmentFile=-/home/student/.config/dsi/database.env
-ExecStart=/opt/dsi-fastapi-venv/bin/uvicorn main:app --host 127.0.0.1 --port 8000
+User=fastapi
+Group=fastapi
+WorkingDirectory=/opt/dsi-fastapi
+EnvironmentFile=-/home/fastapi/.config/dsi/database.env
+ExecStart=/opt/dsi-fastapi-venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
 Restart=on-failure
 
 [Install]
@@ -354,6 +371,18 @@ done
 systemctl enable nginx certbot.timer
 systemctl disable dsi-fastapi
 systemctl reset-failed dsi-fastapi || true
+
+# Validate the dedicated FastAPI account and its service configuration.
+id fastapi >/dev/null
+getent passwd fastapi | grep -q '^fastapi:'
+test "$(getent passwd fastapi | cut -d: -f6)" = "/home/fastapi"
+test "$(getent passwd fastapi | cut -d: -f7)" = "/usr/sbin/nologin"
+test -d /home/fastapi/.config/dsi
+test "$(stat -c '%U:%G' /home/fastapi/.config/dsi)" = "fastapi:fastapi"
+test "$(stat -c '%a' /home/fastapi/.config/dsi)" = "700"
+test "$(systemctl show dsi-fastapi --property=User --value)" = "fastapi"
+test "$(systemctl show dsi-fastapi --property=Group --value)" = "fastapi"
+
 systemctl restart postgresql nginx
 
 test "$(curl --fail --silent http://127.0.0.1:3838/ |
