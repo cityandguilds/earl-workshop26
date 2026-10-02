@@ -1,3 +1,5 @@
+import re
+from html import unescape
 from pathlib import Path
 
 import pytest
@@ -30,34 +32,39 @@ Body for {page_id}.
 """
 
 
-def test_course_skeleton_loads_in_deterministic_order() -> None:
+def test_workshop_content_loads_in_deterministic_order() -> None:
     workshop = load_workshop(Path("content"))
 
     assert [course_page.id for course_page in workshop.pages] == [
         "orientation",
-        "access-workshop-vm",
-        "bash-primer",
+        "cloud-computing",
+        "linux",
+        "unix",
         "install-software",
-        "runtime",
-        "containers",
-        "postgresql",
-        "deployment-options",
-        "prepare-for-deployment",
-        "serve-shiny-app",
-        "serve-quarto-document",
-        "serve-fastapi-app",
+        "postgresql-open-data",
+        "postgresql-open-data-solutions",
+        "shiny-server-introduction",
+        "shiny-server-deployment",
+        "containers-docker-introduction",
+        "shinyproxy-introduction",
+        "fastapi-introduction",
+        "fastapi-flights",
+        "quarto-flights-report",
         "next-steps",
+        "postgresql-open-data-instructor",
+        "fastapi-flights-instructor",
     ]
-    assert [section.name for section in workshop.sections] == [
+    assert list(dict.fromkeys(section.name for section in workshop.sections)) == [
         "Getting started",
-        "Application setup",
-        "Data services",
-        "Deployment choices",
-        "Serving applications",
-        "Operations and next steps",
+        "PostgreSQL",
+        "Shiny",
+        "Docker and ShinyProxy",
+        "FastAPI",
+        "Quarto",
+        "Next steps",
+        "Instructor resources",
     ]
-    assert workshop.pages[0].resources[0].file == "examples/hello.txt"
-    assert "<h2>To be authored</h2>" in workshop.pages[0].html
+    assert "<h2>Workshop learning outcomes</h2>" in workshop.pages[0].html
 
 
 def test_duplicate_stable_ids_fail_with_both_paths(tmp_path: Path) -> None:
@@ -134,6 +141,112 @@ def test_raw_html_is_escaped_but_markdown_is_rendered() -> None:
     assert "<script>" not in rendered
     assert "&lt;script&gt;alert('x')&lt;/script&gt;" in rendered
     assert "<strong>safe Markdown</strong>" in rendered
+
+
+@pytest.mark.parametrize(
+    "language",
+    [
+        "bash",
+        "python",
+        "r",
+        "R",
+        "{r}",
+        "sql",
+        "yaml",
+        "dockerfile",
+        "nginx",
+        "json",
+        "ini",
+        "powershell",
+    ],
+)
+def test_code_highlighting_preserves_code_text(language: str) -> None:
+    code = 'value < 2 & "example"\n    indented_value\n'
+    rendered = render_markdown(f"```{language}\n{code}```")
+
+    code_html = re.search(r"<code[^>]*>(.*?)</code>", rendered, re.DOTALL)
+    assert code_html is not None
+    assert '<span class="' in code_html.group(1)
+    assert unescape(re.sub(r"<[^>]+>", "", code_html.group(1))) == code
+    normalised = language.strip("{}").lower()
+    assert f'<span class="code-language">.{normalised}</span>' in rendered
+    assert f'class="language-{normalised}"' in rendered
+
+
+@pytest.mark.parametrize("language", ["", "text", "not-a-language"])
+def test_plain_code_is_not_guessed_or_rendered_as_html(language: str) -> None:
+    rendered = render_markdown(f"```{language}\n<script>alert('x')</script>\n```")
+
+    code_html = re.search(r"<code[^>]*>(.*?)</code>", rendered, re.DOTALL)
+    assert code_html is not None
+    assert '<span class="' not in code_html.group(1)
+    assert '<span class="code-language">Plain text</span>' in rendered
+    assert "<script>" not in rendered
+    assert "&lt;script&gt;" in rendered
+
+
+def test_markdown_renders_headings_lists_tables_and_quotes() -> None:
+    rendered = render_markdown(
+        "## Heading\n\n- **Bold** and `inline code`\n\n> A quote\n\n"
+        "| Name | Value |\n| --- | --- |\n| Example | 42 |"
+    )
+    for markup in [
+        "<h2>Heading</h2>",
+        "<ul>",
+        "<strong>Bold</strong>",
+        "<code>inline code</code>",
+        "<blockquote>",
+        "<table>",
+        "<td>42</td>",
+    ]:
+        assert markup in rendered
+
+
+def test_quarto_fence_normalisation_does_not_change_nested_example() -> None:
+    rendered = render_markdown("````text\n```{r}\nx <- 1\n```\n````")
+    assert "```{r}" in rendered
+
+
+def test_blockquotes_keep_html_escaped() -> None:
+    rendered = render_markdown(
+        "> **Note:** <script>alert('x')</script>\n\n> > Nested quote\n\n&gt; literal"
+    )
+    assert "<script>" not in rendered
+    assert "&lt;script&gt;" in rendered
+    assert "<strong>Note:</strong>" in rendered
+    assert rendered.count("<blockquote>") == 3
+    assert "<p>&gt; literal</p>" in rendered
+
+
+@pytest.mark.parametrize("language", ["sql", "bash", "text", ""])
+def test_code_preserves_tabs_blank_lines_and_literal_entities(language: str) -> None:
+    source = '\n\tSELECT "<example> &amp;";\n\n'
+    rendered = render_markdown(f"```{language}\n{source}```")
+    code_html = re.search(r"<code[^>]*>(.*?)</code>", rendered, re.DOTALL)
+    assert code_html is not None
+    assert unescape(re.sub(r"<[^>]+>", "", code_html.group(1))) == source
+
+
+def test_code_fences_work_inside_lists_and_blockquotes() -> None:
+    rendered = render_markdown(
+        "3. Run the query:\n\n   ```sql\n   SELECT 42;\n   ```\n\n"
+        "4. Read the result.\n\n> ```bash\n> echo 'done'\n> ```\n"
+    )
+    assert '<ol start="3">' in rendered
+    assert re.search(r'<li>.*?<figure[^>]+data-language="sql".*?</figure>.*?</li>', rendered, re.S)
+    assert re.search(r'<blockquote>.*?<figure[^>]+data-language="bash"', rendered, re.S)
+    assert rendered.count('class="code-block"') == 2
+
+
+def test_markdown_handles_autolinks_without_allowing_raw_html_or_script_links() -> None:
+    rendered = render_markdown(
+        '<https://example.org>\n\n<div onclick="alert(1)">Example</div>\n\n'
+        "[unsafe](javascript:alert(1))\n\n```unknown\n<script>alert(1)</script>\n```"
+    )
+    assert '<a href="https://example.org">' in rendered
+    assert '<div onclick="' not in rendered
+    assert "<script>" not in rendered
+    assert 'href="javascript:' not in rendered
 
 
 def test_page_order_changes_without_route_changes(tmp_path: Path) -> None:

@@ -247,6 +247,9 @@ def test_attendee_dashboard_hides_credentials_and_copies_the_password_on_demand(
 
     client = TestClient(app)
     login(client, "attendee", "account-password")
+    course = client.get("/course")
+    assert 'href="/attendee">Get credentials</a>' in course.text
+    assert "selectable-vm-password" not in course.text
     response = client.get("/attendee")
     assert response.status_code == 200
     assert "View VM credentials" in response.text

@@ -127,6 +127,18 @@ def _safe_next_path(next_path: str | None) -> str:
     return "/"
 
 
+def _login_redirect(request: Request) -> RedirectResponse:
+    """Ask a course visitor to sign in, then return to the requested page."""
+
+    next_path = request.url.path
+    if request.url.query:
+        next_path += f"?{request.url.query}"
+    return RedirectResponse(
+        url=f"/login?next={quote(next_path, safe='')}",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
 def _safe_resource_path(
     resources_dir: Path, resource_path: str, declared_resources: frozenset[str]
 ) -> Path | None:
@@ -352,20 +364,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return templates.TemplateResponse(request=request, name="index.html", context=context)
 
     @app.get("/learn-more", response_class=HTMLResponse)
-    async def learn_more_page(
-        request: Request, db: Session = Depends(get_db)
-    ) -> HTMLResponse:
+    async def learn_more_page(request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
         user = current_user(db, request)
         context = _template_context(
             request, settings=runtime_settings, workshop=workshop, user=user
         )
-        return templates.TemplateResponse(
-            request=request, name="learn_more.html", context=context
-        )
+        return templates.TemplateResponse(request=request, name="learn_more.html", context=context)
 
     @app.get("/course", response_class=HTMLResponse)
-    async def course_index(request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
-        user = require_authenticated_user(db, request)
+    async def course_index(request: Request, db: Session = Depends(get_db)) -> Response:
+        user = current_user(db, request)
+        if user is None:
+            return _login_redirect(request)
         context = _template_context(
             request, settings=runtime_settings, workshop=workshop, user=user
         )
@@ -410,7 +420,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         establish_session(request, db, user)
         destination = _safe_next_path(next_path)
         if destination == "/" and user.role == UserRole.ATTENDEE.value:
-            destination = "/attendee"
+            destination = "/course"
         return RedirectResponse(url=destination, status_code=status.HTTP_303_SEE_OTHER)
 
     @app.post("/logout")
@@ -819,8 +829,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/course/{page_id}", response_class=HTMLResponse)
     async def course_page(
         request: Request, page_id: str, db: Session = Depends(get_db)
-    ) -> HTMLResponse:
-        user = require_authenticated_user(db, request)
+    ) -> Response:
+        user = current_user(db, request)
+        if user is None:
+            return _login_redirect(request)
         page = next((candidate for candidate in workshop.pages if candidate.id == page_id), None)
         if page is None:
             raise HTTPException(status_code=404, detail="Course page not found")

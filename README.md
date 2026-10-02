@@ -81,7 +81,14 @@ The authoring contract is:
 - `resources` defaults to an empty list. Each item must contain a relative `file` path and may
   contain a non-empty `label`. Paths are normalized to `/`, cannot be absolute, and cannot
   contain `..` segments. A resource is visible on a page only when that page declares it.
-- The body is rendered as Markdown with fenced-code and table support. Raw HTML is escaped.
+- The body is rendered as CommonMark with table and strikethrough support. Raw HTML is escaped.
+  Declare a code-fence language (for example, `bash`, `python`, `r`, `sql`, or `yaml`) for
+  syntax highlighting. Quarto `{r}` fences are also highlighted as R. Unknown or omitted
+  languages use plain code. Code blocks show their language above the snippet and preserve
+  tabs and blank lines. Fences also work inside lists and blockquotes.
+  Each code block has a Copy button that also supports HTTP pages
+  through a selection-based copy fallback. If both browser copy methods are blocked, the code
+  is selected for manual copying. Highlighting assets are served locally.
 
 Changing front matter or adding/removing Markdown files changes the current course sequence when
 the application restarts; no Python route edits are required.
@@ -91,7 +98,9 @@ Pages are ordered deterministically by `section_order`, section name, `order`, a
 ## Course access, resources, and progress
 
 Sign in and open `/course` for the authenticated course index. Course pages at
-`/course/<stable-page-id>` require an active portal session. They show previous/next links across
+`/course/<stable-page-id>` require an active portal session. Signed-out visitors are taken to
+sign-in and returned to the selected course page afterwards, including after a failed attempt.
+Course pages show previous/next links across
 the current deterministic page sequence, a page-specific resources menu, and the current
 attendee's completion summary.
 
@@ -164,6 +173,12 @@ The command prompts for a username, password, and confirmation. Portal roles are
 
 An attendee signs in with their unique username, not their optional display name. The display name is for presentation in the administrator area and is not unique enough to authenticate with.
 
+Attendees normally land on `/course` after signing in; a course page selected before sign-in
+takes precedence. The attendee header includes **Get credentials**, which opens `/attendee`.
+From there, **View VM credentials** reveals the assigned connection details. The SSH password
+stays hidden and is fetched only when the attendee chooses to copy it. Administrators retain
+their existing navigation and login destination.
+
 Portal account passwords are stored only as one-way Argon2 password hashes. They are not logged or returned by the application. VM passwords are a different credential type: they must be recoverable for the assigned attendee, so they are encrypted with `EARL_WORKSHOP_VM_ENCRYPTION_KEY` before being stored in the `vm_credentials.encrypted_password` field and decrypted only for that attendee's dashboard. The `vm_credentials` model stores the host and SSH username alongside that ciphertext; `vm_assignments` links a credential to an attendee and tracks whether it is active, with database uniqueness allowing at most one active VM per attendee and one active attendee per VM. Assignment lookup uses the authenticated session identity and never accepts an attendee-supplied record ID. An attendee without an active assignment sees a waiting state.
 
 ## Administrator operations
@@ -197,6 +212,16 @@ uv build
 ```
 
 The wheel includes the package templates/CSS plus the current course skeleton, resources, and supplied asset files. When the package is run outside a source checkout, it falls back to those packaged files; set the content/resource/asset directory variables to use an external authoring or deployment directory.
+
+## Browser clipboard checks
+
+The clipboard check exercises actual clipboard writes on localhost and an ordinary HTTP
+origin, a rejected Clipboard API call, and a browser that blocks both copy methods:
+
+```bash
+uv run --with playwright playwright install chromium
+uv run --with playwright python tests/browser/check_course_copy.py
+```
 
 ## Deferred infrastructure
 

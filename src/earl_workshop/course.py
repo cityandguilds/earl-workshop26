@@ -8,8 +8,9 @@ from pathlib import Path
 from posixpath import normpath
 from typing import Any
 
-import markdown
 import yaml
+
+from .markdown_rendering import render_markdown
 
 
 class CourseContentError(ValueError):
@@ -70,48 +71,7 @@ class Workshop:
         )
 
 
-_FENCE_PATTERN = r"^ {0,3}(`{3,}|~{3,})[^\n]*\n.*?^ {0,3}\1\s*$"
-_INLINE_CODE_PATTERN = r"(`+)(.+?)(?<!`)\1(?!`)"
-_PROTECTED_RE = re.compile(
-    f"(?:{_FENCE_PATTERN})|(?:{_INLINE_CODE_PATTERN})", re.MULTILINE | re.DOTALL
-)
 _ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
-
-
-def _escape_raw_html(markdown_source: str) -> str:
-    """Escape HTML-looking text while leaving Markdown code spans and fences intact.
-
-    Python-Markdown intentionally supports raw HTML. Workshop authors should be able to
-    paste examples without turning them into trusted page markup, so only Markdown's own
-    generated HTML is allowed through to the template.
-    """
-
-    protected: list[str] = []
-
-    def protect(match: re.Match[str]) -> str:
-        protected.append(match.group(0))
-        return f"\x00EARL_CODE_{len(protected) - 1}\x00"
-
-    escaped_parts: list[str] = []
-    cursor = 0
-    for match in _PROTECTED_RE.finditer(markdown_source):
-        escaped_parts.append(
-            markdown_source[cursor : match.start()].replace("<", "&lt;").replace(">", "&gt;")
-        )
-        escaped_parts.append(protect(match))
-        cursor = match.end()
-    escaped_parts.append(markdown_source[cursor:].replace("<", "&lt;").replace(">", "&gt;"))
-    escaped = "".join(escaped_parts)
-    for index, original in enumerate(protected):
-        escaped = escaped.replace(f"\x00EARL_CODE_{index}\x00", original)
-    return escaped
-
-
-def render_markdown(markdown_source: str) -> str:
-    """Render Markdown with fenced code/tables and with raw HTML disabled."""
-
-    safe_source = _escape_raw_html(markdown_source)
-    return markdown.markdown(safe_source, extensions=["fenced_code", "tables"])
 
 
 def _read_yaml(path: Path, *, description: str) -> dict[str, Any]:

@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 from cryptography.fernet import Fernet
@@ -82,14 +83,14 @@ def test_learn_more_page_links_to_official_course_sites(tmp_path: Path) -> None:
     assert "City &amp; Guilds" in page.text
     assert "https://www.peoplecert.org/organizations/browse-certifications" in page.text
     assert "https://www.cityandguilds.com/Home/qualifications-and-apprenticeships" in page.text
-    for image_url in (
-        "/static/images/peoplecert-placeholder.png",
-        "/static/images/city-guilds-placeholder.png",
+    for image_url, content_type in (
+        ("/static/images/peoplecert-logo.svg", "image/svg+xml"),
+        ("/static/images/city-guilds-placeholder.png", "image/png"),
     ):
         assert image_url in page.text
         image = client.get(image_url)
         assert image.status_code == 200
-        assert image.headers["content-type"].startswith("image/png")
+        assert image.headers["content-type"].startswith(content_type)
 
 
 def test_course_page_is_rendered_from_loaded_content(tmp_path: Path) -> None:
@@ -104,7 +105,9 @@ def test_course_page_is_rendered_from_loaded_content(tmp_path: Path) -> None:
     )
     client = TestClient(create_app(settings))
 
-    assert client.get("/course/runtime").status_code == 401
+    anonymous = client.get("/course/install-software", follow_redirects=False)
+    assert anonymous.status_code == 303
+    assert anonymous.headers["location"] == "/login?next=%2Fcourse%2Finstall-software"
     with client.app.state.session_factory() as session:
         create_user(
             session,
@@ -125,11 +128,14 @@ def test_course_page_is_rendered_from_loaded_content(tmp_path: Path) -> None:
     )
     assert login.status_code == 303
 
-    response = client.get("/course/runtime")
+    response = client.get("/course/install-software")
 
     assert response.status_code == 200
-    assert "Set up the application runtime" in response.text
-    assert "echo &quot;hello from the workshop&quot;" in response.text
+    assert "Install software on a virtual machine" in response.text
+    assert "<h2>What you will learn</h2>" in response.text
+    assert "sudo apt update" in re.sub(r"<[^>]+>", "", response.text)
+    assert 'href="/static/code-highlight.css"' in response.text
+    assert 'src="/static/course.js"' in response.text
     assert client.get("/course/not-a-page").status_code == 404
 
 
