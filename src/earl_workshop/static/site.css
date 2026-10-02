@@ -12,6 +12,10 @@
   line-height: 1.55;
 }
 
+html {
+  font-size: 90%;
+}
+
 * { box-sizing: border-box; }
 
 body { margin: 0; min-width: 18rem; }
