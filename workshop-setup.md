@@ -607,38 +607,29 @@ https://dsi-01.earl.sjp-analytics.co.uk/shiny/shinyFlights/
 
 ## Part 4: FastAPI (20 min)
 
-<!-- FastAPI is still not enabled or started
+FastAPI is not enabled or started. /api/ will initially return 502 Bad Gateway.
 
-cloud-init starts:
-
-docker nginx postgresql shiny-server shinyproxy
-code-server@student
-
-but not:
-
-dsi-fastapi
-
-Add:
-
-systemctl enable --now dsi-fastapi
-
-However, this only works if the golden image contains:
-
-/home/student/fastapi/main.py
-
-If workshop participants are expected to create the FastAPI application themselves, leaving it stopped is ok.
-/api/ will initially return 502 Bad Gateway. -->
-
-- Build the API.
-- Query PostgreSQL on `127.0.0.1:5432`.
-- Load credentials from `~/.config/dsi/database.env`.
-- Use Swagger UI through Nginx:
+- Create FastAPI exposing endpoints to query flights data in the postgres database.
+  - Query PostgreSQL on `127.0.0.1:5432`.
+  - Load credentials from `~/.config/dsi/database.env`.
+- enable and start dsi-fastapi
+- Use Swagger UI (via Nginx routing):
 
 ```text
 https://dsi-01.earl.sjp-analytics.co.uk/api/docs
 ```
 
-## Part 5: Docker and ShinyProxy (30 min)
+- use an endpoint from the Swagger UI
+- send a request to the API using a system library on your local machine
+
+## Part 5: Quarto (20 min)
+
+- Create a Quarto report.
+- Query PostgreSQL data.
+- Render to HTML.
+- Publish through Nginx or retrieve it with SCP.
+
+## Part 6: Docker and ShinyProxy (30 min)
 
 - Build a container.
 - Explain containerised deployment.
@@ -647,13 +638,6 @@ https://dsi-01.earl.sjp-analytics.co.uk/api/docs
 ```text
 https://dsi-01.earl.sjp-analytics.co.uk/proxy/
 ```
-
-## Part 6: Quarto (20 min)
-
-- Create a Quarto report.
-- Query PostgreSQL data.
-- Render to HTML.
-- Publish through Nginx or retrieve it with SCP.
 
 # Updating the golden image
 
