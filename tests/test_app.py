@@ -105,7 +105,9 @@ def test_course_page_is_rendered_from_loaded_content(tmp_path: Path) -> None:
     )
     client = TestClient(create_app(settings))
 
-    assert client.get("/course/install-software").status_code == 401
+    anonymous = client.get("/course/install-software", follow_redirects=False)
+    assert anonymous.status_code == 303
+    assert anonymous.headers["location"] == "/login?next=%2Fcourse%2Finstall-software"
     with client.app.state.session_factory() as session:
         create_user(
             session,

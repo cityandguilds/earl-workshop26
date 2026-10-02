@@ -140,6 +140,26 @@ def test_login_logout_and_signed_cookie_configuration(tmp_path: Path) -> None:
     assert client.get("/admin").status_code == 401
 
 
+def test_login_rejects_external_and_malformed_return_destinations(tmp_path: Path) -> None:
+    app = create_app(settings_for(tmp_path))
+    add_user(app, username="admin", password="admin password", role=UserRole.ADMIN)
+    for destination in ("https://example.org", "//example.org", "/\\example.org", "course"):
+        client = TestClient(app, follow_redirects=False)
+        form = client.get("/login", params={"next": destination})
+        assert 'name="next_path" value="/"' in form.text
+        response = client.post(
+            "/login",
+            data={
+                "username": "admin",
+                "password": "admin password",
+                "csrf_token": csrf_from(form),
+                "next_path": destination,
+            },
+        )
+        assert response.status_code == 303
+        assert response.headers["location"] == "/"
+
+
 def test_inactive_account_and_unknown_account_have_safe_login_failure(tmp_path: Path) -> None:
     app = create_app(settings_for(tmp_path))
     add_user(

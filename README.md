@@ -95,7 +95,9 @@ Pages are ordered deterministically by `section_order`, section name, `order`, a
 ## Course access, resources, and progress
 
 Sign in and open `/course` for the authenticated course index. Course pages at
-`/course/<stable-page-id>` require an active portal session. They show previous/next links across
+`/course/<stable-page-id>` require an active portal session. Signed-out visitors are taken to
+sign-in and returned to the selected course page afterwards, including after a failed attempt.
+Course pages show previous/next links across
 the current deterministic page sequence, a page-specific resources menu, and the current
 attendee's completion summary.
 

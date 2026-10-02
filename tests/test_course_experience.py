@@ -1,6 +1,7 @@
 import re
 from dataclasses import replace
 from pathlib import Path
+from urllib.parse import quote
 
 from cryptography.fernet import Fernet
 from fastapi.testclient import TestClient
@@ -63,7 +64,9 @@ def test_authenticated_course_index_groups_pages_and_shows_progress(tmp_path: Pa
     add_attendee(app, "attendee", "attendee password")
     client = TestClient(app, follow_redirects=False)
 
-    assert client.get("/course").status_code == 401
+    anonymous = client.get("/course")
+    assert anonymous.status_code == 303
+    assert anonymous.headers["location"] == "/login?next=%2Fcourse"
     login(client, "attendee", "attendee password")
 
     index = client.get("/course")
@@ -82,6 +85,56 @@ def test_authenticated_course_index_groups_pages_and_shows_progress(tmp_path: Pa
     assert 'href="/course/cloud-computing"' in first_page.text
     assert 'href="/course"' in first_page.text
     assert 'action="/course/orientation/completion"' in first_page.text
+
+
+def test_anonymous_course_login_returns_to_requested_page_even_after_failure(
+    tmp_path: Path,
+) -> None:
+    app = create_app(settings_for(tmp_path))
+    add_attendee(app, "attendee", "attendee password")
+
+    for destination in ("/course", "/course/orientation", "/course/unix?example=one%20two"):
+        client = TestClient(app, follow_redirects=False)
+        redirect = client.get(destination)
+        assert redirect.status_code == 303
+        assert redirect.headers["location"] == f"/login?next={quote(destination, safe='')}"
+        login_page = client.get(redirect.headers["location"])
+        assert login_page.status_code == 200
+        assert f'name="next_path" value="{destination}"' in login_page.text
+        submitted = {
+            "username": "attendee",
+            "password": "incorrect password",
+            "csrf_token": csrf_from(login_page),
+            "next_path": destination,
+        }
+        failure = client.post("/login", data=submitted)
+        assert failure.status_code == 401
+        assert f'name="next_path" value="{destination}"' in failure.text
+        submitted["password"] = "attendee password"
+        submitted["csrf_token"] = csrf_from(failure)
+        success = client.post("/login", data=submitted)
+        assert success.status_code == 303
+        assert success.headers["location"] == destination
+        assert client.get(destination).status_code == 200
+
+
+def test_expired_course_session_redirects_without_redirecting_protected_posts(
+    tmp_path: Path,
+) -> None:
+    app = create_app(settings_for(tmp_path))
+    attendee = add_attendee(app, "attendee", "attendee password")
+    client = TestClient(app, follow_redirects=False)
+    login(client, "attendee", "attendee password")
+    with app.state.session_factory() as db:
+        account = db.get(User, attendee.id)
+        account.session_version += 1
+        db.commit()
+
+    response = client.get("/course/orientation")
+    assert response.status_code == 303
+    assert response.headers["location"] == "/login?next=%2Fcourse%2Forientation"
+    assert client.post("/course/orientation/completion").status_code == 401
+    assert client.get("/attendee/credentials/password").status_code == 401
 
 
 def test_declared_resource_is_public_and_has_browser_and_curl_urls(tmp_path: Path) -> None:
