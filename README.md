@@ -81,10 +81,12 @@ The authoring contract is:
 - `resources` defaults to an empty list. Each item must contain a relative `file` path and may
   contain a non-empty `label`. Paths are normalized to `/`, cannot be absolute, and cannot
   contain `..` segments. A resource is visible on a page only when that page declares it.
-- The body is rendered as Markdown with fenced-code and table support. Raw HTML is escaped.
+- The body is rendered as CommonMark with table and strikethrough support. Raw HTML is escaped.
   Declare a code-fence language (for example, `bash`, `python`, `r`, `sql`, or `yaml`) for
   syntax highlighting. Quarto `{r}` fences are also highlighted as R. Unknown or omitted
-  languages use plain code. Each code block has a Copy button that also supports HTTP pages
+  languages use plain code. Code blocks show their language above the snippet and preserve
+  tabs and blank lines. Fences also work inside lists and blockquotes.
+  Each code block has a Copy button that also supports HTTP pages
   through a selection-based copy fallback. If both browser copy methods are blocked, the code
   is selected for manual copying. Highlighting assets are served locally.
 
@@ -210,6 +212,16 @@ uv build
 ```
 
 The wheel includes the package templates/CSS plus the current course skeleton, resources, and supplied asset files. When the package is run outside a source checkout, it falls back to those packaged files; set the content/resource/asset directory variables to use an external authoring or deployment directory.
+
+## Browser clipboard checks
+
+The clipboard check exercises actual clipboard writes on localhost and an ordinary HTTP
+origin, a rejected Clipboard API call, and a browser that blocks both copy methods:
+
+```bash
+uv run --with playwright playwright install chromium
+uv run --with playwright python tests/browser/check_course_copy.py
+```
 
 ## Deferred infrastructure
 

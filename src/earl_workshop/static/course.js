@@ -42,27 +42,15 @@
     return copyWithSelection(value);
   };
 
-  document.querySelectorAll(".markdown-body pre").forEach((pre, index) => {
-    const code = pre.querySelector("code");
-    if (!code) return;
+  document.querySelectorAll(".markdown-body .code-block").forEach((block, index) => {
+    const code = block.querySelector("pre code");
+    const button = block.querySelector(".code-copy-button");
+    const label = block.querySelector(".code-copy-label");
+    const status = block.querySelector(".code-copy-status");
+    if (!code || !button || !label || !status) return;
 
-    const block = document.createElement("div");
-    block.className = "code-block";
-    const toolbar = document.createElement("div");
-    toolbar.className = "code-toolbar";
-    const status = document.createElement("span");
-    status.className = "code-copy-status";
-    status.setAttribute("role", "status");
-    const button = document.createElement("button");
-    button.className = "copy-button";
-    button.type = "button";
-    button.textContent = "Copy";
+    button.hidden = false;
     button.setAttribute("aria-label", `Copy code block ${index + 1}`);
-    toolbar.append(status, button);
-    pre.before(block);
-    block.append(toolbar, pre);
-    pre.tabIndex = 0;
-    pre.setAttribute("aria-label", `Code block ${index + 1}`);
 
     let resetTimer;
     button.addEventListener("click", async () => {
@@ -70,10 +58,10 @@
       status.textContent = "";
       const copied = await copyText(code.textContent);
       if (copied) {
-        button.textContent = "Copied!";
+        label.textContent = "Copied!";
         status.textContent = "Code copied.";
         resetTimer = setTimeout(() => {
-          button.textContent = "Copy";
+          label.textContent = "Copy";
           status.textContent = "";
         }, 2000);
       } else {
@@ -84,7 +72,7 @@
           selection.removeAllRanges();
           selection.addRange(range);
         }
-        button.textContent = "Copy";
+        label.textContent = "Copy";
         status.textContent = "Your browser blocked copying. Press Ctrl+C or ⌘C to copy the selected code.";
       }
     });

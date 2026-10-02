@@ -8,8 +8,9 @@ from pathlib import Path
 from posixpath import normpath
 from typing import Any
 
-import markdown
 import yaml
+
+from .markdown_rendering import render_markdown
 
 
 class CourseContentError(ValueError):
@@ -70,73 +71,7 @@ class Workshop:
         )
 
 
-_FENCE_PATTERN = r"^ {0,3}(`{3,}|~{3,})[^\n]*\n.*?^ {0,3}\1\s*$"
-_INLINE_CODE_PATTERN = r"(`+)(.+?)(?<!`)\1(?!`)"
-_PROTECTED_RE = re.compile(
-    f"(?:{_FENCE_PATTERN})|(?:{_INLINE_CODE_PATTERN})", re.MULTILINE | re.DOTALL
-)
 _ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
-_QUARTO_R_FENCE_RE = re.compile(r"^( {0,3}(?:`{3,}|~{3,}))\{r\}[ \t]*$", re.IGNORECASE)
-_HTML_OR_QUOTE_RE = re.compile(r"(?P<quote>^ {0,3}(?:>[ \t]*)+)|[<>]", re.MULTILINE)
-
-
-def _escape_html_text(text: str) -> str:
-    """Escape angle brackets while preserving Markdown blockquote markers."""
-
-    return _HTML_OR_QUOTE_RE.sub(
-        lambda match: (
-            match.group(0)
-            if match.group("quote") is not None
-            else {"<": "&lt;", ">": "&gt;"}[match.group(0)]
-        ),
-        text,
-    )
-
-
-def _escape_raw_html(markdown_source: str) -> str:
-    """Escape HTML-looking text while leaving Markdown code spans and fences intact.
-
-    Python-Markdown intentionally supports raw HTML. Workshop authors should be able to
-    paste examples without turning them into trusted page markup, so only Markdown's own
-    generated HTML is allowed through to the template.
-    """
-
-    protected: list[str] = []
-
-    def protect(match: re.Match[str]) -> str:
-        protected.append(match.group(0))
-        return f"\x00EARL_CODE_{len(protected) - 1}\x00"
-
-    escaped_parts: list[str] = []
-    cursor = 0
-    for match in _PROTECTED_RE.finditer(markdown_source):
-        escaped_parts.append(_escape_html_text(markdown_source[cursor : match.start()]))
-        escaped_parts.append(protect(match))
-        cursor = match.end()
-    escaped_parts.append(_escape_html_text(markdown_source[cursor:]))
-    escaped = "".join(escaped_parts)
-    for index, original in enumerate(protected):
-        escaped = escaped.replace(f"\x00EARL_CODE_{index}\x00", original)
-    return escaped
-
-
-def _normalise_quarto_r_fence(match: re.Match[str]) -> str:
-    """Treat a Quarto R chunk as R without changing the code inside its fence."""
-
-    opening, newline, body = match.group(0).partition("\n")
-    return _QUARTO_R_FENCE_RE.sub(r"\1r", opening) + newline + body
-
-
-def render_markdown(markdown_source: str) -> str:
-    """Render Markdown with highlighted code, tables, and raw HTML disabled."""
-
-    safe_source = _escape_raw_html(markdown_source)
-    safe_source = _PROTECTED_RE.sub(_normalise_quarto_r_fence, safe_source)
-    return markdown.markdown(
-        safe_source,
-        extensions=["fenced_code", "tables", "codehilite"],
-        extension_configs={"codehilite": {"guess_lang": False, "pygments_style": "monokai"}},
-    )
 
 
 def _read_yaml(path: Path, *, description: str) -> dict[str, Any]:
