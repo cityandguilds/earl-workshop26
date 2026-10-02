@@ -83,14 +83,14 @@ def test_learn_more_page_links_to_official_course_sites(tmp_path: Path) -> None:
     assert "City &amp; Guilds" in page.text
     assert "https://www.peoplecert.org/organizations/browse-certifications" in page.text
     assert "https://www.cityandguilds.com/Home/qualifications-and-apprenticeships" in page.text
-    for image_url in (
-        "/static/images/peoplecert-placeholder.png",
-        "/static/images/city-guilds-placeholder.png",
+    for image_url, content_type in (
+        ("/static/images/peoplecert-logo.svg", "image/svg+xml"),
+        ("/static/images/city-guilds-placeholder.png", "image/png"),
     ):
         assert image_url in page.text
         image = client.get(image_url)
         assert image.status_code == 200
-        assert image.headers["content-type"].startswith("image/png")
+        assert image.headers["content-type"].startswith(content_type)
 
 
 def test_course_page_is_rendered_from_loaded_content(tmp_path: Path) -> None:

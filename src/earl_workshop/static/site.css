@@ -308,6 +308,10 @@ code { padding: 0.1rem 0.3rem; color: var(--ink); background: #E9ECEC; border-ra
 
 .learn-card img { display: block; width: 100%; aspect-ratio: 3 / 2; object-fit: cover; }
 
+.learn-logo { display: grid; place-items: center; aspect-ratio: 3 / 2; padding: 2rem; }
+
+.learn-card .learn-logo img { width: 100%; max-width: 20rem; height: auto; aspect-ratio: auto; object-fit: contain; }
+
 .learn-card-copy { display: grid; gap: 0.2rem; padding: 1.25rem; }
 
 .learn-card-copy strong { font-size: 1.45rem; }
