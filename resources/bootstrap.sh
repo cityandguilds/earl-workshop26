@@ -268,14 +268,18 @@ chown student:student /home/student/.config/code-server/config.yaml
 chmod 0600 /home/student/.config/code-server/config.yaml
 
 # Configuring Nginx (VM's public gateway)
-# enables WebSocket proxying (important for interactive services e.g. code-server, Shiny)
-# image installs Certbot and enables its renewal timer, but does not issue a certificate, 
-# this is left for the provisioning script once the hostname is known
+# Enables WebSocket proxying for interactive services such as code-server
+# and Shiny.
+#
+# Certbot is installed and its renewal timer is enabled, but no certificate
+# is issued here because the hostname is not known until provisioning.
+
 log "Configuring default Nginx site"
+
 cat > /etc/nginx/sites-available/dsi-workshop <<'NGINX'
 map $http_upgrade $connection_upgrade {
     default upgrade;
-    '' close;
+    ''      close;
 }
 
 server {
@@ -286,7 +290,7 @@ server {
     location = /healthz {
         access_log off;
         default_type text/plain;
-        return 200 'ok\n';        
+        return 200 'ok\n';
     }
 
     location / {
@@ -294,6 +298,7 @@ server {
         index index.html;
     }
 
+    # FastAPI is installed or enabled later. Until then, requests to /api/ will receive a 502 response.
     location /api/ {
         proxy_pass http://127.0.0.1:8000/;
         proxy_set_header Host $host;
@@ -309,9 +314,11 @@ server {
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection $connection_upgrade;
         proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-Host $host;
-   }
+    }
 
     location /code/ {
         proxy_pass http://127.0.0.1:8080/;
@@ -319,6 +326,8 @@ server {
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection $connection_upgrade;
         proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-Host $host;
     }
@@ -329,6 +338,8 @@ server {
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection $connection_upgrade;
         proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-Host $host;
     }
@@ -336,19 +347,30 @@ server {
 NGINX
 
 rm -f /etc/nginx/sites-enabled/default
-ln -sfn /etc/nginx/sites-available/dsi-workshop \
+
+ln -sfn \
+  /etc/nginx/sites-available/dsi-workshop \
   /etc/nginx/sites-enabled/dsi-workshop
+
 nginx -t
 
-# Enable services
+log "Enabling image services"
+
 systemctl daemon-reload
-# startup readiness validation
 systemctl enable --now shiny-server shinyproxy
+systemctl enable --now nginx certbot.timer
+
+log "Waiting for ShinyProxy"
+
+shinyproxy_ready=false
 
 for attempt in $(seq 1 30); do
-  if curl --fail --silent \
+  if curl \
+      --fail \
+      --silent \
       --output /dev/null \
       http://127.0.0.1:8081/; then
+    shinyproxy_ready=true
     echo "ShinyProxy is ready"
     break
   fi
@@ -359,46 +381,70 @@ for attempt in $(seq 1 30); do
     exit 1
   fi
 
-  if [[ "$attempt" -eq 30 ]]; then
-    echo "ERROR: ShinyProxy readiness timeout" >&2
-    journalctl -u shinyproxy -n 100 --no-pager
-    exit 1
-  fi
-
   sleep 2
 done
 
-systemctl enable nginx certbot.timer
-systemctl disable dsi-fastapi
-systemctl reset-failed dsi-fastapi || true
+if [[ "$shinyproxy_ready" != true ]]; then
+  echo "ERROR: ShinyProxy readiness timeout" >&2
+  journalctl -u shinyproxy -n 100 --no-pager
+  exit 1
+fi
 
-# Validate the dedicated FastAPI account and its service configuration.
+# validate fastapi
+log "Preparing FastAPI workshop account"
+# Validate only the account and directories created by this image.
+# The participant provisioning process installs or enables the service later.
 id fastapi >/dev/null
-getent passwd fastapi | grep -q '^fastapi:'
 test "$(getent passwd fastapi | cut -d: -f6)" = "/home/fastapi"
 test "$(getent passwd fastapi | cut -d: -f7)" = "/usr/sbin/nologin"
+
 test -d /home/fastapi/.config/dsi
 test "$(stat -c '%U:%G' /home/fastapi/.config/dsi)" = "fastapi:fastapi"
 test "$(stat -c '%a' /home/fastapi/.config/dsi)" = "700"
-test "$(systemctl show dsi-fastapi --property=User --value)" = "fastapi"
-test "$(systemctl show dsi-fastapi --property=Group --value)" = "fastapi"
 
+# If a FastAPI unit was installed elsewhere in the image build, make sure it
+# remains stopped and disabled. Do nothing if the unit does not yet exist.
+if systemctl list-unit-files --no-legend dsi-fastapi.service 2>/dev/null |
+    grep -q '^dsi-fastapi\.service'; then
+  systemctl disable --now dsi-fastapi.service
+
+  if systemctl is-failed --quiet dsi-fastapi.service; then
+    systemctl reset-failed dsi-fastapi.service
+  fi
+fi
+
+# Restart and validate image services
+log "Restarting and validating image services"
 systemctl restart postgresql nginx
 
-test "$(curl --fail --silent http://127.0.0.1:3838/ |
-  wc -c)" -gt 0
+# check listening ports
+curl \
+  --fail \
+  --silent \
+  --output /dev/null \
+  http://127.0.0.1:3838/
 
-curl --fail --silent \
+curl \
+  --fail \
+  --silent \
   --output /dev/null \
   http://127.0.0.1:8081/
 
-ss -lnt |
-  grep -q '127.0.0.1:3838'
+check_listening_port() {
+  local port="$1"
+  local service="$2"
 
-ss -lnt |
-  grep -q '127.0.0.1:8081'
+  if ! ss -lnt | grep -qE "LISTEN.+127\\.0\\.0\\.1:${port}"; then
+    echo "ERROR: ${service} is not listening on 127.0.0.1:${port}" >&2
+    return 1
+  fi
+}
 
-ss -lnt |
-  grep -q '127.0.0.1:9090'
+check_listening_port 3838 "Shiny Server"
+check_listening_port 8081 "ShinyProxy"
+check_listening_port 9090 "ShinyProxy management endpoint"
 
+echo "Image service validation completed successfully"
+
+# done
 log "Golden-image build completed"
