@@ -267,6 +267,32 @@ Versioned snapshot
 ### Create the builder Droplet
 
 ```bash
+init_builder_variables=(
+  BUILD_DROPLET
+  REGION
+  BUILD_SIZE
+  BASE_IMAGE
+  SSH_KEY_ID
+  VPC_UUID
+  BUILDER_TAG
+  WORKSHOP_TAG
+)
+
+SSH_KEY_ID=$(doctl compute ssh-key list \
+  --format ID,Name --no-header \
+  | awk -v name="$SSH_KEY_NAME" '$2 == name {print $1; exit}')
+
+VPC_UUID=$(doctl vpcs list --format ID,Name --no-header \
+  | grep -F "$VPC_NAME" \
+  | cut -d' ' -f1)
+
+for variable in "${init_builder_variables[@]}"; do
+  if [[ -z "${!variable:-}" ]]; then
+    printf 'Missing required variable: %s\n' "$variable" >&2
+    exit 1
+  fi
+done
+
 doctl compute droplet create "$BUILD_DROPLET" \
   --region "$REGION" \
   --size "$BUILD_SIZE" \
