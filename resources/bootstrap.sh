@@ -11,7 +11,7 @@ set -Eeuo pipefail
 umask 022
 export DEBIAN_FRONTEND=noninteractive
 
-readonly UBUNTU_CODENAME="noble"
+readonly EXPECTED_UBUNTU_CODENAME="noble"
 readonly CRAN_KEY_FINGERPRINT="E298A3A825C0D65DFD57CBB651716619E084DAB9"
 readonly CRAN_KEYRING="/etc/apt/keyrings/cran-ubuntu.asc"
 
@@ -72,8 +72,8 @@ log "Validating build host"
 
 . /etc/os-release
 [[ "${ID:-}" == "ubuntu" ]] || fail "only Ubuntu is supported"
-[[ "${VERSION_CODENAME:-}" == "$UBUNTU_CODENAME" ]] ||
-  fail "expected Ubuntu ${UBUNTU_CODENAME}, found ${VERSION_CODENAME:-unknown}"
+[[ "${VERSION_CODENAME:-}" == "$EXPECTED_UBUNTU_CODENAME" ]] ||
+  fail "expected Ubuntu ${EXPECTED_UBUNTU_CODENAME}, found ${VERSION_CODENAME:-unknown}"
 
 log "Updating Ubuntu"
 
@@ -103,7 +103,7 @@ actual_cran_fingerprint="$(
   fail "unexpected CRAN signing-key fingerprint"
 
 cat > /etc/apt/sources.list.d/cran-r.list <<EOF
-deb [signed-by=${CRAN_KEYRING}] https://cloud.r-project.org/bin/linux/ubuntu ${UBUNTU_CODENAME}-cran40/
+deb [signed-by=${CRAN_KEYRING}] https://cloud.r-project.org/bin/linux/ubuntu ${EXPECTED_UBUNTU_CODENAME}-cran40/
 EOF
 
 log "Installing system packages"
@@ -293,7 +293,7 @@ curl --fail --silent --show-error --location \
 chmod 0644 /etc/apt/keyrings/docker.gpg
 
 cat > /etc/apt/sources.list.d/docker.list <<EOF
-deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu ${UBUNTU_CODENAME} stable
+deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu ${EXPECTED_UBUNTU_CODENAME} stable
 EOF
 
 apt-get update
