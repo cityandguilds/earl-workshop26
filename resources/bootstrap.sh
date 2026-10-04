@@ -71,7 +71,7 @@ install -d -m 0755 /etc/dsi
 # Install R packages
 log "Installing R packages"
 Rscript --vanilla -e \
-  "install.packages(
+  'install.packages(
     c(
       "shiny",
       "RPostgres",
@@ -85,7 +85,7 @@ Rscript --vanilla -e \
     ),
     repos='https://cloud.r-project.org',
     Ncpus=1
-  )"
+  )'
 
 # Install Shiny Server
 log "Installing Shiny Server"
