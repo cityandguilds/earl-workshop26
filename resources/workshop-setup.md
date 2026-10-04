@@ -509,7 +509,7 @@ Do not develop the automation using production certificates. First test with one
 
 ```bash
 PARTICIPANT_COUNT=1
-CERTBOT_STAGING=true
+CERTBOT_STAGING=false
 ```
 
 A staging certificate intentionally produces a browser trust warning. Once the complete workflow succeeds, delete the disposable test Droplet and DNS record, then provision the real class with appropriate `PARTICIPANT_COUNT` (9) and with `CERTBOT_STAGING=false`.
@@ -596,9 +596,63 @@ cd test
 quarto render
 EOF
 
-sudo -u shiny quarto check
-sudo -u shiny quarto render example.qmd
-sudo -u student quarto render example.qmd
+sudo -H -u shiny bash -c '
+  cd "$HOME"
+  quarto check
+'
+sudo mkdir -p /srv/shiny-server/test
+sudo cp /tmp/quarto-test/test/test.qmd /srv/shiny-server/test/
+sudo chown -R shiny:shiny /srv/shiny-server/test
+sudo chmod 0755 /srv/shiny-server/test
+sudo chmod 0644 /srv/shiny-server/test/test.qmd
+sudo -H -u shiny bash -c '
+  cd "$HOME"
+  quarto render /srv/shiny-server/test/test.qmd
+'
+sudo -H -u student bash -c '
+  cd "$HOME"
+  quarto render /tmp/quarto-test/test/test.qmd
+'
+```
+
+## Participant VMs vs workshop admin VM
+
+Both VM types use the same DigitalOcean project, VPC, golden-image snapshot, monitoring, and broadly similar machine specification. Their first-boot configuration is kept separate.
+
+### Participant VMs
+
+- One VM per participant, using the `student` account.
+- Generate unique SSH, code-server, and PostgreSQL credentials.
+- Configure PostgreSQL, Docker, Nginx, code-server, Shiny Server, and ShinyProxy.
+- Expose workshop development services through Nginx.
+- Create participant-specific DNS records such as `dsi-01.<domain>`.
+- Record generated credentials in the protected participant access file.
+
+### Workshop admin VM
+
+- One shared VM at `workshop.earl.sjp-analytics.co.uk`.
+- Create `workshopadmin`, `sam`, `ali`, and `nel`.
+- Allow key-only SSH from any source IP, with root and password login disabled.
+- Install `uv` and Python 3.13.
+- Clone and deploy the FastAPI workshop portal.
+- Run the portal as a hardened systemd service behind Nginx and HTTPS.
+- Store application data, secrets, the uv cache, and managed Python outside user home directories.
+- Generate persistent session and VM-credential encryption secrets.
+- Idempotently create or update the DigitalOcean firewall and DNS record.
+- Do not configure participant-specific PostgreSQL, code-server, Shiny, or ShinyProxy services.
+
+The participant cloud-init template should therefore remain participant-specific, while the admin VM uses separate provisioning tailored to hosting and administering the workshop portal.
+
+```bash
+ssh -t -i "${PRIVATE_KEY}" \
+  "workshopadmin@${ADMIN_HOSTNAME}" \
+  "sudo -u workshopadmin bash -lc '
+    set -a
+    source /etc/earl-workshop/earl-workshop.env
+    set +a
+    cd /opt/earl-workshop
+    exec .venv/bin/earl-workshop create-admin
+  '"
 ```
 
 # Updating the golden image

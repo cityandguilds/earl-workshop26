@@ -25,3 +25,6 @@ data/
 .vscode/
 .codex/
 todos.*
+
+participant-config/
+admin-config/
