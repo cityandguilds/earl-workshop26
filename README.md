@@ -223,10 +223,6 @@ uv run --with playwright playwright install chromium
 uv run --with playwright python tests/browser/check_course_copy.py
 ```
 
-## Deferred infrastructure
+## Infrastructure as code
 
-This v0.2.0 increment does not include VM provisioning, SSH connectivity checks, VM health
-monitoring, DigitalOcean/Terraform provisioning, production bootstrap automation, final
-curriculum, domain/TLS automation, or conference deployment. VM provisioning is not part of
-v0.2.0: administrators enter VM records manually through `/admin`. It also does not require
-Node.js.
+v0.3.0 increment includes DigitalOcean VM provisioning, SSH connectivity checks, production bootstrap automation, curriculum, domain/TLS automation, and conference deployment. Administrators enter VM records manually through `/admin`.

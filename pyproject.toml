@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "earl-workshop26"
-version = "0.2.0"
+version = "0.3.0"
 description = "A small, branded workshop portal for the EARL 2026 workshop."
 readme = "README.md"
 requires-python = ">=3.13"
