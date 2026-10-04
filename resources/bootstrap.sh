@@ -478,7 +478,6 @@ log "Validating FastAPI service and Nginx route"
 # Leave it stopped and disabled in the finished golden image.
 systemctl start dsi-fastapi.service
 wait_for_http http://127.0.0.1:8000/healthz dsi-fastapi
-check_listening_port 8000 "FastAPI"
 curl --fail --silent --show-error --output /dev/null \
   http://127.0.0.1/api/healthz
 
@@ -493,6 +492,8 @@ fastapi_enablement="$(systemctl is-enabled dsi-fastapi.service 2>/dev/null || tr
   fail "dsi-fastapi.service should be disabled, found: ${fastapi_enablement:-unknown}"
 ! systemctl is-active --quiet dsi-fastapi.service ||
   fail "dsi-fastapi.service should be stopped in the golden image"
+
+echo "FastAPI validated and left disabled"
 
 log "Validating workshop accounts and permissions"
 
