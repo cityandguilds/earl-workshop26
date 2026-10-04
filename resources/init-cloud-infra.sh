@@ -1,3 +1,5 @@
+# init cloud infra
+#!/usr/bin/env bash
 
 # Authenticate doctl and Verify access
 doctl auth init --context workshop
