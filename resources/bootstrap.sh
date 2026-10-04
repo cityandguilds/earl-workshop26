@@ -56,15 +56,6 @@ wait_for_http() {
   fail "$service readiness timeout waiting for $url"
 }
 
-check_listening_port() {
-  local port="$1"
-  local service="$2"
-
-  if ! ss -H -lnt | awk -v endpoint="127.0.0.1:${port}" '$4 == endpoint { found = 1 } END { exit !found }'; then
-    fail "$service is not listening on 127.0.0.1:${port}"
-  fi
-}
-
 log "Validating build host"
 
 [[ "$(id -u)" -eq 0 ]] || fail "run this script as root"
@@ -479,8 +470,7 @@ systemctl enable --now \
 
 wait_for_http http://127.0.0.1:3838/ shiny-server
 wait_for_http http://127.0.0.1:8081/ shinyproxy
-
-check_listening_port 9090 "ShinyProxy management endpoint"
+wait_for_http http://127.0.0.1:9090/actuator/health shinyproxy
 
 log "Validating FastAPI service and Nginx route"
 
