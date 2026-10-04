@@ -12,24 +12,6 @@ Participant VM provisioning with DigitalOcean.
 
 > **Architecture:** Nginx is the only public application entry point. code-server, Shiny Server, FastAPI, ShinyProxy, and PostgreSQL listen locally and are reached through Nginx where appropriate.
 
-## Authenticate doctl and Verify access
-Using a named context makes it easier to separate this account from other DigitalOcean accounts.
-
-```bash
-doctl auth init --context workshop
-
-# Paste the PAT when prompted. Input may remain invisible while pasting.
-# Activate that context:
-doctl auth switch --context workshop
-
-# verify
-doctl auth list
-doctl account get
-doctl compute region list
-```
-
-If these return account and region information, authentication is working.
-
 ## prepare domain
 - Create a workshop sub-domain in DigitalOcean (Core Cloud → Networking → Domains → Add a domain), e.g. `earl.sjp-analytics.co.uk`.
 - Delegate sub-domain in Cloudflare or other DNS provider. Create NS records using DigitalOcean nameservers (→ DNS Records). "For anything earl.sjp-analytics.co.uk, ask DigitalOcean."
@@ -55,7 +37,39 @@ Create these records only after the Droplets exist because DigitalOcean assigns 
 
 The provisioning script currently assumes DigitalOcean DNS. Set `CREATE_DIGITALOCEAN_DNS=false` if DNS is managed elsewhere, then create equivalent `A` records with that provider.
 
-## Define infrastructure variables
+## Create cloud infrastructure
+
+`init-cloud-infra.sh` contains DigitalOcean commands for initiation of cloud infrastructure:
+
+- Authenticate doctl and Verify access
+- Define infrastructure variables
+- Check current availability before committing to values
+- Create the administrator SSH key
+- Create a Project
+- Create the VPC
+- Create the Cloud Firewall
+
+`init-cloud-infra.sh` contains all the code but it's walked through in the following sections.
+
+### Authenticate doctl and Verify access
+Using a named context makes it easier to separate this account from other DigitalOcean accounts.
+
+```bash
+doctl auth init --context workshop
+
+# Paste the PAT when prompted. Input may remain invisible while pasting.
+# Activate that context:
+doctl auth switch --context workshop
+
+# verify
+doctl auth list
+doctl account get
+doctl compute region list
+```
+
+If these return account and region information, authentication is working.
+
+### Define infrastructure variables
 
 - add env vars to `resources/workshop.env`
 
@@ -105,7 +119,7 @@ for variable in "${required_variables[@]}"; do
 done
 ```
 
-Check current availability before committing to values:
+### Check availability before committing to values
 
 ```bash
 doctl compute region list
@@ -120,7 +134,7 @@ Region-droplet combination options for builder:
 | s-1vcpu-2gb-intel | Basic Intel |        2048 |     1 |        50 |         14.00 |     0.020830 | lon1   |
 | s5-1vcpu-3gb-50gb | v5 Shared   |        3072 |     1 |        50 |         25.89 |     0.034800 | atl1   |
 
-## Create the administrator SSH key record
+### Create administrator SSH key
 
 This is the organiser's *fallback* key. Each participant **also** receives a separate key later.
 
@@ -143,7 +157,7 @@ test -n "$SSH_KEY_ID"
 echo "$SSH_KEY_ID"
 ```
 
-## Create a Project
+### Create a Project
 
 A Project groups the workshop resources for organisation and billing visibility.
 
@@ -163,7 +177,7 @@ test -n "$PROJECT_ID"
 echo "$PROJECT_ID"
 ```
 
-## Create the VPC
+### Create the VPC
 
 The VPC is the private regional network for the Droplets.
 
@@ -184,7 +198,7 @@ test -n "$VPC_UUID"
 echo "$VPC_UUID"
 ```
 
-## Cloud Firewall
+### Create the Cloud Firewall
 
 Public ports:
 
