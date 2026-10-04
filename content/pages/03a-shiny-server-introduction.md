@@ -1,9 +1,9 @@
 ---
 id: shiny-server-introduction
-title: Introduction to Shiny Server
+title: "Introduction to Shiny Server"
 slug: "shiny-server-introduction"
 order: 200
-section: Shiny
+section: "Shiny"
 section_order: 200
 summary: "Understand what open source Shiny Server is, how it runs Shiny applications, and when to use it"
 level: "Beginner"

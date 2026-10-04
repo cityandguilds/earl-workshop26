@@ -3,7 +3,7 @@ id: postgresql-open-data-instructor
 title: "Instructor notes: PostgreSQL with OpenFlights"
 slug: "postgresql-open-data-instructor"
 order: 900
-section: Instructor resources
+section: "Instructor resources"
 section_order: 900
 summary: "Preparation and recovery notes for the flights-schema session"
 level: "Instructor"

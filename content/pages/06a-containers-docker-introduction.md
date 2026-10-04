@@ -1,9 +1,9 @@
 ---
 id: containers-docker-introduction
-title: Containers and an introduction to Docker
+title: "Containers and an introduction to Docker"
 slug: "containers-docker-introduction"
 order: 500
-section: Docker and ShinyProxy
+section: "Docker and ShinyProxy"
 section_order: 500
 summary: "Understand containers, images, Dockerfiles, registries, ports, and the Docker workflow"
 level: "Beginner"

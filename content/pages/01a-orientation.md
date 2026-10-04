@@ -1,9 +1,9 @@
 ---
 id: orientation
-title: Welcome, intros and workshop overview
+title: "Welcome, intros and workshop overview"
 slug: "orientation"
 order: 10
-section: Getting started
+section: "Getting started"
 section_order: 10
 summary: "Welcome and overview of workshop"
 level: "Beginner"

@@ -1,9 +1,9 @@
 ---
 id: postgresql-open-data
-title: PostgreSQL with open relational data
+title: "PostgreSQL with open relational data"
 slug: "postgresql-open-data"
 order: 100
-section: PostgreSQL
+section: "PostgreSQL"
 section_order: 100
 summary: "Download open aviation data, load it into a PostgreSQL schema, and answer questions with SQL"
 level: "Beginner"

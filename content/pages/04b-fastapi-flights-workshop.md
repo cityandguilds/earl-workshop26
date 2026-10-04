@@ -1,9 +1,9 @@
 ---
 id: fastapi-flights
-title: Publish flights data with FastAPI
+title: "Publish flights data with FastAPI"
 slug: "fastapi-flights"
 order: 310
-section: FastAPI
+section: "FastAPI"
 section_order: 310
 summary: "Create, start, document, and query a FastAPI backed by PostgreSQL"
 level: "Beginner"

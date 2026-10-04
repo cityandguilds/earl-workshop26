@@ -1,9 +1,9 @@
 ---
 id: fastapi-introduction
-title: Introduction to FastAPI
+title: "Introduction to FastAPI"
 slug: "fastapi-introduction"
 order: 300
-section: FastAPI
+section: "FastAPI"
 section_order: 300
 summary: "Understand what FastAPI is, how it works, and when to use it"
 level: "Beginner"

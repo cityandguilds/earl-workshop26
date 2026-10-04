@@ -3,7 +3,7 @@ id: cloud-computing
 title: "Cloud computing for this workshop"
 slug: "cloud-computing"
 order: 20
-section: Getting started
+section: "Getting started"
 section_order: 20
 summary: "Meet the cloud services that make your workshop VM reachable, secure, and reproducible."
 level: "Beginner"

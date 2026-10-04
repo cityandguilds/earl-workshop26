@@ -3,7 +3,7 @@ id: unix
 title: "Unix command-line primer"
 slug: "unix-command-line-primer"
 order: 40
-section: Getting started
+section: "Getting started"
 section_order: 40
 summary: "Navigate files, copy work securely, and inspect a workshop VM from the terminal."
 level: "Beginner"

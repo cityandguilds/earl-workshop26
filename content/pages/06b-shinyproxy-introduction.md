@@ -1,9 +1,9 @@
 ---
 id: shinyproxy-introduction
-title: Introduction to ShinyProxy
+title: "Introduction to ShinyProxy"
 slug: "shinyproxy-introduction"
 order: 510
-section: Docker and ShinyProxy
+section: "Docker and ShinyProxy"
 section_order: 510
 summary: "Understand what ShinyProxy is, how it launches containerised applications, and when to use it"
 level: "Beginner"

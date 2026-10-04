@@ -3,7 +3,7 @@ id: linux
 title: "Why Linux for open source data software?"
 slug: "linux"
 order: 30
-section: Getting started
+section: "Getting started"
 section_order: 30
 summary: "Understand why cloud VMs commonly run Linux and what a distribution provides."
 level: "Beginner"

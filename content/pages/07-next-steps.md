@@ -1,9 +1,9 @@
 ---
 id: next-steps
-title: Next steps
+title: "Next steps"
 slug: "next-steps"
 order: 600
-section: Next steps
+section: "Next steps"
 section_order: 600
 summary: "Continue exploring the workshop repository, infrastructure, applications, and cloud deployment"
 level: "Beginner"

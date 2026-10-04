@@ -1,9 +1,9 @@
 ---
 id: postgresql-open-data-solutions
-title: PostgreSQL open-data exercise solutions
+title: "PostgreSQL open-data exercise solutions"
 slug: "postgresql-open-data-solutions"
 order: 110
-section: PostgreSQL
+section: "PostgreSQL"
 section_order: 110
 summary: "Suggested solutions using the flights schema"
 level: "Beginner"

@@ -1,9 +1,9 @@
 ---
 id: quarto-flights-report
-title: Publish a flights report with Quarto
+title: "Publish a flights report with Quarto"
 slug: "quarto-flights-report"
 order: 400
-section: Quarto
+section: "Quarto"
 section_order: 400
 summary: "Query PostgreSQL, render a Quarto report, publish it with Nginx, and download it using SCP"
 level: "Beginner"

@@ -1,9 +1,9 @@
 ---
 id: install-software
-title: Install software, system libraries, etc.
+title: "Install software, system libraries, etc."
 slug: "install-software"
 order: 50
-section: Getting started
+section: "Getting started"
 section_order: 50
 summary: "Install software, system libraries and R packages on a Linux machine"
 level: "Beginner"
