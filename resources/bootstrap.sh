@@ -486,12 +486,15 @@ curl --fail --silent --show-error --output /dev/null \
 [[ "$(systemctl show dsi-fastapi.service --property=Group --value)" == "fastapi" ]]
 
 systemctl disable --now dsi-fastapi.service
-systemctl reset-failed dsi-fastapi.service || true
-fastapi_enablement="$(systemctl is-enabled dsi-fastapi.service 2>/dev/null || true)"
+fastapi_enablement="$(
+  systemctl is-enabled dsi-fastapi.service 2>/dev/null || true
+)"
 [[ "$fastapi_enablement" == "disabled" ]] ||
   fail "dsi-fastapi.service should be disabled, found: ${fastapi_enablement:-unknown}"
-! systemctl is-active --quiet dsi-fastapi.service ||
+
+if systemctl is-active --quiet dsi-fastapi.service; then
   fail "dsi-fastapi.service should be stopped in the golden image"
+fi
 
 echo "FastAPI validated and left disabled"
 
