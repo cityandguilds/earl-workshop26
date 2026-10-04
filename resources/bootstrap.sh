@@ -27,7 +27,7 @@ wget -qO- \
   https://cloud.r-project.org/bin/linux/ubuntu/marutter_pubkey.asc \
   > /etc/apt/trusted.gpg.d/cran_ubuntu_key.asc
 
-add-apt-repository \
+add-apt-repository -y \
   "deb https://cloud.r-project.org/bin/linux/ubuntu noble-cran40/"
 
 apt-get update
