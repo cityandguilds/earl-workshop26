@@ -9,6 +9,7 @@ if ! [[ -t 0 && -t 1 ]]; then
     exit 1
 fi
 
+# load/generate env vars
 cd resources
 # chmod 600 workshop.env
 
@@ -53,28 +54,33 @@ for variable in "${required_variables[@]}"; do
   fi
 done
 
-# env vars
+init_builder_variables=(
+  BUILD_DROPLET
+  REGION
+  BUILD_SIZE
+  BASE_IMAGE
+  SSH_KEY_ID
+  VPC_UUID
+  BUILDER_TAG
+  WORKSHOP_TAG
+)
+
 SSH_KEY_ID=$(doctl compute ssh-key list \
   --format ID,Name --no-header \
   | awk -v name="$SSH_KEY_NAME" '$2 == name {print $1; exit}')
-
-test -n "$SSH_KEY_ID"
-echo "$SSH_KEY_ID"
-
-PROJECT_ID=$(doctl projects list --format ID,Name --no-header \
-  | awk -v name="$PROJECT_NAME" '$2 == name {print $1; exit}')
-
-test -n "$PROJECT_ID"
-echo "$PROJECT_ID"
 
 VPC_UUID=$(doctl vpcs list --format ID,Name --no-header \
   | grep -F "$VPC_NAME" \
   | cut -d' ' -f1)
 
-test -n "$VPC_UUID"
-echo "$VPC_UUID"
+for variable in "${init_builder_variables[@]}"; do
+  if [[ -z "${!variable:-}" ]]; then
+    printf 'Missing required variable: %s\n' "$variable" >&2
+    exit 1
+  fi
+done
 
-# droplet
+# create droplet
 doctl compute droplet create "$BUILD_DROPLET" \
   --region "$REGION" \
   --size "$BUILD_SIZE" \
@@ -109,7 +115,7 @@ printf '%s  %s\n' "$BOOTSTRAP_SHA256" /tmp/bootstrap.sh \
 chmod 700 /tmp/bootstrap.sh
 sudo /tmp/bootstrap.sh
 
-# test
+# test install
 docker --version
 docker compose version
 R --version
@@ -136,7 +142,7 @@ curl --head http://127.0.0.1:8081/
 curl --head http://127.0.0.1:8000/docs
 sudo -u postgres psql -Atc "show listen_addresses;"
 
-# clean
+# clean VM
 sudo apt-get clean
 sudo rm -rf /var/lib/apt/lists/*
 sudo rm -rf /tmp/* /var/tmp/*

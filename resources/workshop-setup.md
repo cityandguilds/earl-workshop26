@@ -278,6 +278,14 @@ Versioned snapshot
       +-- dsi-10
 ```
 
+- load/generate and check for necessary env vars
+- Create the builder VM
+- ssh onto VM and install software
+- test installation
+- clean up the VM
+- create the snapshot from local machine
+- delete the droplet
+
 ### Create the builder Droplet
 
 ```bash
