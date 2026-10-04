@@ -163,7 +163,7 @@ install -d -o root -g root -m 0755 /etc/dsi
 
 log "Installing R packages"
 
-Rscript --vanilla <<'RSCRIPT'
+Rscript --vanilla - <<'RSCRIPT'
 packages <- c(
   "shiny",
   "RPostgres",
