@@ -480,8 +480,6 @@ systemctl enable --now \
 wait_for_http http://127.0.0.1:3838/ shiny-server
 wait_for_http http://127.0.0.1:8081/ shinyproxy
 
-check_listening_port 3838 "Shiny Server"
-check_listening_port 8081 "ShinyProxy"
 check_listening_port 9090 "ShinyProxy management endpoint"
 
 log "Validating FastAPI service and Nginx route"
