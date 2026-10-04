@@ -83,7 +83,7 @@ Rscript --vanilla -e \
       "quarto",
       "ggplot2"
     ),
-    repos='https://cloud.r-project.org',
+    repos="https://cloud.r-project.org",
     Ncpus=1
   )'
 
