@@ -1,57 +1,146 @@
 #!/usr/bin/env bash
 
-# Golden-image build script
-# prepares a reusable Ubuntu image containing the software required by workshop VMs.
-# Participant-specific settings (SSH keys, passwords, hostnames, databases, service startup and TLS)
-# are handled later by cloud-init and a provisioning script
+# Golden-image build script for Ubuntu 24.04 (Noble), amd64.
+#
+# This image contains shared workshop software and service definitions.
+# Participant-specific settings such as SSH keys, passwords, hostnames,
+# databases, TLS certificates, and participant services are applied later by
+# cloud-init or the provisioning script.
 
-set -euo pipefail
+set -Eeuo pipefail
+umask 022
 export DEBIAN_FRONTEND=noninteractive
 
-log() { printf '\n===== %s =====\n' "$*"; }
+readonly UBUNTU_CODENAME="noble"
+readonly CRAN_KEY_FINGERPRINT="E298A3A825C0D65DFD57CBB651716619E084DAB9"
+readonly CRAN_KEYRING="/etc/apt/keyrings/cran-ubuntu.asc"
+
+log() {
+  printf '\n===== %s =====\n' "$*"
+}
+
+fail() {
+  printf 'ERROR: %s\n' "$*" >&2
+  exit 1
+}
+
+on_error() {
+  local exit_code=$?
+  printf '\nERROR: bootstrap failed at line %s: %s\n' "${BASH_LINENO[0]}" "${BASH_COMMAND}" >&2
+  exit "$exit_code"
+}
+trap on_error ERR
+
+wait_for_http() {
+  local url="$1"
+  local service="$2"
+  local attempts="${3:-30}"
+  local delay="${4:-2}"
+  local attempt
+
+  for ((attempt = 1; attempt <= attempts; attempt++)); do
+    if curl --fail --silent --show-error --output /dev/null "$url"; then
+      printf '%s is ready\n' "$service"
+      return 0
+    fi
+
+    if ! systemctl is-active --quiet "$service"; then
+      journalctl -u "$service" -n 100 --no-pager >&2 || true
+      fail "$service stopped during startup"
+    fi
+
+    sleep "$delay"
+  done
+
+  journalctl -u "$service" -n 100 --no-pager >&2 || true
+  fail "$service readiness timeout waiting for $url"
+}
+
+check_listening_port() {
+  local port="$1"
+  local service="$2"
+
+  if ! ss -H -lnt | awk -v endpoint="127.0.0.1:${port}" '$4 == endpoint { found = 1 } END { exit !found }'; then
+    fail "$service is not listening on 127.0.0.1:${port}"
+  fi
+}
+
+log "Validating build host"
+
+[[ "$(id -u)" -eq 0 ]] || fail "run this script as root"
+[[ "$(dpkg --print-architecture)" == "amd64" ]] || fail "only amd64 is supported"
+
+. /etc/os-release
+[[ "${ID:-}" == "ubuntu" ]] || fail "only Ubuntu is supported"
+[[ "${VERSION_CODENAME:-}" == "$UBUNTU_CODENAME" ]] ||
+  fail "expected Ubuntu ${UBUNTU_CODENAME}, found ${VERSION_CODENAME:-unknown}"
 
 log "Updating Ubuntu"
+
 apt-get update
 apt-get upgrade -y
 
-ARCH=$(dpkg --print-architecture)
+# Install the tools needed to configure third-party repositories before using
+# wget, gpg, or add-apt-repository.
+apt-get install -y --no-install-recommends \
+  ca-certificates \
+  curl \
+  gnupg \
+  software-properties-common \
+  wget
 
-if [[ "$ARCH" != "amd64" ]]; then
-  printf 'Unsupported architecture: %s; expected amd64\n' "$ARCH" >&2
-  exit 1
-fi
+log "Configuring the CRAN repository"
 
-# Install base software
-log "Installing packages"
-wget -qO- \
-  https://cloud.r-project.org/bin/linux/ubuntu/marutter_pubkey.asc \
-  > /etc/apt/trusted.gpg.d/cran_ubuntu_key.asc
+install -d -m 0755 /etc/apt/keyrings
+wget --quiet --output-document="$CRAN_KEYRING" \
+  https://cloud.r-project.org/bin/linux/ubuntu/marutter_pubkey.asc
 
-add-apt-repository -y \
-  "deb https://cloud.r-project.org/bin/linux/ubuntu noble-cran40/"
+actual_cran_fingerprint="$(
+  gpg --show-keys --with-colons "$CRAN_KEYRING" |
+    awk -F: '$1 == "fpr" { print $10; exit }'
+)"
+[[ "$actual_cran_fingerprint" == "$CRAN_KEY_FINGERPRINT" ]] ||
+  fail "unexpected CRAN signing-key fingerprint"
+
+cat > /etc/apt/sources.list.d/cran-r.list <<EOF
+deb [signed-by=${CRAN_KEYRING}] https://cloud.r-project.org/bin/linux/ubuntu ${UBUNTU_CODENAME}-cran40/
+EOF
+
+log "Installing system packages"
 
 apt-get update
+apt-get install -y --no-install-recommends \
+  apt-transport-https \
+  build-essential \
+  certbot \
+  git \
+  jq \
+  libcurl4-openssl-dev \
+  libpq-dev \
+  libssl-dev \
+  libuv1-dev \
+  libxml2-dev \
+  lsb-release \
+  nginx \
+  openjdk-21-jdk \
+  openssl \
+  pkg-config \
+  postgresql \
+  postgresql-contrib \
+  python3 \
+  python3-certbot-nginx \
+  python3-pip \
+  python3-venv \
+  r-base \
+  r-base-dev \
+  unzip
 
-apt-get install -y \
-  ca-certificates curl wget git unzip gnupg \
-  software-properties-common apt-transport-https \
-  build-essential pkg-config lsb-release jq openssl nginx \
-  libcurl4-openssl-dev libssl-dev libpq-dev \
-  libxml2-dev libuv1-dev \
-  python3 python3-pip python3-venv \
-  postgresql postgresql-contrib \
-  openjdk-21-jdk r-base r-base-dev \
-  certbot python3-certbot-nginx
+log "Creating workshop accounts and directories"
 
-# Create persistent participant and FastAPI service accounts
-log "Creating workshop accounts"
 if ! id student >/dev/null 2>&1; then
   useradd --create-home --shell /bin/bash student
 fi
 
-# FastAPI runs as a dedicated, non-interactive system account. A home directory
-# is required because cloud-init later installs its database.env below
-# /home/fastapi/.config/dsi.
 if ! id fastapi >/dev/null 2>&1; then
   useradd \
     --system \
@@ -61,39 +150,54 @@ if ! id fastapi >/dev/null 2>&1; then
     fastapi
 fi
 
-install -d -o student -g student -m 0700 /home/student/.config
-install -d -o student -g student -m 0700 /home/student/.config/code-server
-install -d -o student -g student -m 0700 /home/student/.config/dsi
-install -d -o fastapi -g fastapi -m 0700 /home/fastapi/.config
-install -d -o fastapi -g fastapi -m 0700 /home/fastapi/.config/dsi
-install -d -m 0755 /etc/dsi
+install -d -o student -g student -m 0700 \
+  /home/student/.config \
+  /home/student/.config/code-server \
+  /home/student/.config/dsi
 
-# Install R packages
+install -d -o fastapi -g fastapi -m 0700 \
+  /home/fastapi/.config \
+  /home/fastapi/.config/dsi
+
+install -d -o root -g root -m 0755 /etc/dsi
+
 log "Installing R packages"
-Rscript --vanilla -e \
-  'install.packages(
-    c(
-      "shiny",
-      "RPostgres",
-      "DBI",
-      "httr",
-      "jsonlite",
-      "knitr",
-      "rmarkdown",
-      "quarto",
-      "ggplot2"
-    ),
-    repos="https://cloud.r-project.org",
-    Ncpus=1
-  )'
 
-# Install Shiny Server
+Rscript --vanilla <<'RSCRIPT'
+packages <- c(
+  "shiny",
+  "RPostgres",
+  "DBI",
+  "httr",
+  "jsonlite",
+  "knitr",
+  "rmarkdown",
+  "quarto",
+  "ggplot2"
+)
+
+missing <- setdiff(packages, rownames(installed.packages()))
+if (length(missing) > 0L) {
+  install.packages(
+    missing,
+    repos = "https://cloud.r-project.org",
+    Ncpus = 1L
+  )
+}
+
+failed <- packages[
+  !vapply(packages, requireNamespace, logical(1), quietly = TRUE)
+]
+if (length(failed) > 0L) {
+  stop("R package verification failed: ", paste(failed, collapse = ", "))
+}
+RSCRIPT
+
 log "Installing Shiny Server"
-SHINY_SERVER_VERSION="1.5.23.1030"
-SHINY_SERVER_DEB="/tmp/shiny-server.deb"
-SHINY_SERVER_URL="https://download3.rstudio.org/ubuntu-20.04/x86_64/shiny-server-${SHINY_SERVER_VERSION}-amd64.deb"
 
-rm -f "$SHINY_SERVER_DEB"
+readonly SHINY_SERVER_VERSION="1.5.23.1030"
+readonly SHINY_SERVER_DEB="/tmp/shiny-server.deb"
+readonly SHINY_SERVER_URL="https://download3.rstudio.org/ubuntu-20.04/x86_64/shiny-server-${SHINY_SERVER_VERSION}-amd64.deb"
 
 wget \
   --https-only \
@@ -103,10 +207,9 @@ wget \
   "$SHINY_SERVER_URL"
 
 dpkg-deb --info "$SHINY_SERVER_DEB" >/dev/null
-
 apt-get install -y "$SHINY_SERVER_DEB"
+rm -f "$SHINY_SERVER_DEB"
 
-log "Restricting Shiny Server to localhost"
 cat > /etc/shiny-server/shiny-server.conf <<'CONF'
 run_as shiny;
 
@@ -121,90 +224,105 @@ server {
 }
 CONF
 
-systemctl enable shiny-server
+log "Installing FastAPI"
 
-# Prepare FastAPI
-log "Installing FastAPI in a virtual environment"
 python3 -m venv /opt/dsi-fastapi-venv
-/opt/dsi-fastapi-venv/bin/pip install --upgrade pip
-/opt/dsi-fastapi-venv/bin/pip install \
-  fastapi uvicorn sqlalchemy psycopg2-binary pandas
+/opt/dsi-fastapi-venv/bin/python -m pip install --upgrade pip
+/opt/dsi-fastapi-venv/bin/python -m pip install \
+  fastapi \
+  pandas \
+  psycopg2-binary \
+  sqlalchemy \
+  uvicorn
 
-# Prepare the application directory. Participants add the FastAPI code during
-# the workshop; root owns the deployment and the fastapi group can read it.
-install -d -o root -g fastapi -m 0750 /opt/dsi-fastapi
+# A minimal placeholder app lets the image build validate the complete FastAPI
+# service and Nginx route. Participants replace or extend this package later.
+install -d -o root -g fastapi -m 0750 /opt/dsi-fastapi/app
+install -o root -g fastapi -m 0640 /dev/null /opt/dsi-fastapi/app/__init__.py
 
-# systemd runs Uvicorn as the dedicated fastapi account on 127.0.0.1.
-# cloud-init later installs PostgreSQL credentials at
-# /home/fastapi/.config/dsi/database.env. The leading `-` tells systemd not
-# to fail merely because the file is absent in the golden image.
+cat > /opt/dsi-fastapi/app/main.py <<'PYTHON'
+from fastapi import FastAPI
+
+app = FastAPI(title="DSI Workshop API")
+
+
+@app.get("/healthz")
+def healthz() -> dict[str, str]:
+    return {"status": "ok"}
+PYTHON
+
+chown root:fastapi /opt/dsi-fastapi/app/main.py
+chmod 0640 /opt/dsi-fastapi/app/main.py
+
 cat > /etc/systemd/system/dsi-fastapi.service <<'UNIT'
 [Unit]
 Description=DSI Workshop FastAPI
-After=network.target postgresql.service
+After=network-online.target postgresql.service
+Wants=network-online.target
 
 [Service]
+Type=simple
 User=fastapi
 Group=fastapi
 WorkingDirectory=/opt/dsi-fastapi
 EnvironmentFile=-/home/fastapi/.config/dsi/database.env
 ExecStart=/opt/dsi-fastapi-venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
 Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=read-only
 
 [Install]
 WantedBy=multi-user.target
 UNIT
 
-# Restrict PostgreSQL: prevents PostgreSQL from accepting direct external network connections.
-# Cloud-init later creates: workshop_user, workshop_db, participant-specific password, database.env
 log "Configuring PostgreSQL for local access only"
-sed -ri "s/^#?listen_addresses\s*=.*/listen_addresses = '127.0.0.1'/" \
-  /etc/postgresql/*/main/postgresql.conf
-systemctl enable postgresql
 
-# Installing Docker
-# - Adds Docker’s package-signing key.
-# - Determines the system architecture and Ubuntu codename.
-# - Adds Docker’s official repository.
-# - Installs Docker Engine, Buildx and Compose.
-# - Enables Docker at boot.
-# - Adds student to the docker group (run without sudo)
+sed -ri \
+  "s/^#?listen_addresses[[:space:]]*=.*/listen_addresses = '127.0.0.1'/" \
+  /etc/postgresql/*/main/postgresql.conf
+
 log "Installing Docker"
-install -m 0755 -d /etc/apt/keyrings
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
-  | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-chmod a+r /etc/apt/keyrings/docker.gpg
-ARCH=$(dpkg --print-architecture)
-CODENAME=$(. /etc/os-release && echo "$VERSION_CODENAME")
-echo "deb [arch=${ARCH} signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu ${CODENAME} stable" \
-  > /etc/apt/sources.list.d/docker.list
+
+install -d -m 0755 /etc/apt/keyrings
+curl --fail --silent --show-error --location \
+  https://download.docker.com/linux/ubuntu/gpg |
+  gpg --dearmor --yes --output /etc/apt/keyrings/docker.gpg
+chmod 0644 /etc/apt/keyrings/docker.gpg
+
+cat > /etc/apt/sources.list.d/docker.list <<EOF
+deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu ${UBUNTU_CODENAME} stable
+EOF
+
 apt-get update
-apt-get install -y docker-ce docker-ce-cli containerd.io \
-  docker-buildx-plugin docker-compose-plugin
-systemctl enable docker
+apt-get install -y --no-install-recommends \
+  containerd.io \
+  docker-buildx-plugin \
+  docker-ce \
+  docker-ce-cli \
+  docker-compose-plugin
+
 usermod -aG docker student
 
-# Install ShinyProxy (runs as root rather than via dedicated shiny proxy service account)
 log "Installing ShinyProxy"
 
-SHINYPROXY_VERSION="3.2.4"
-SHINYPROXY_SHA256="0bd68e3ba31b5288b5523ee250e90f316f5e0524bd11bcc18645499ede1ee57e"
-SHINYPROXY_JAR="/opt/shinyproxy/shinyproxy.jar"
+readonly SHINYPROXY_VERSION="3.2.4"
+readonly SHINYPROXY_SHA256="0bd68e3ba31b5288b5523ee250e90f316f5e0524bd11bcc18645499ede1ee57e"
+readonly SHINYPROXY_JAR="/opt/shinyproxy/shinyproxy.jar"
 
 install -d -m 0755 /opt/shinyproxy /etc/shinyproxy
-rm -f "$SHINYPROXY_JAR"
-
-curl --fail --location \
+curl \
+  --fail \
+  --location \
   --retry 5 \
   --retry-all-errors \
   --connect-timeout 15 \
   --output "$SHINYPROXY_JAR" \
   "https://github.com/openanalytics/shinyproxy/releases/download/v${SHINYPROXY_VERSION}/shinyproxy-${SHINYPROXY_VERSION}.jar"
 
-echo "${SHINYPROXY_SHA256}  ${SHINYPROXY_JAR}" |
-  sha256sum --check -
-
-test -s "$SHINYPROXY_JAR"
+echo "${SHINYPROXY_SHA256}  ${SHINYPROXY_JAR}" | sha256sum --check -
 
 cat > /etc/shinyproxy/application.yml <<'YAML'
 proxy:
@@ -213,11 +331,9 @@ proxy:
     - id: hello
       display-name: Hello App
       container-image: openanalytics/shinyproxy-demo
-
 server:
   address: 127.0.0.1
   port: 8081
-
 management:
   server:
     address: 127.0.0.1
@@ -231,33 +347,36 @@ After=docker.service
 Requires=docker.service
 
 [Service]
+Type=simple
 User=root
 WorkingDirectory=/etc/shinyproxy
 ExecStart=/usr/bin/java -jar /opt/shinyproxy/shinyproxy.jar --spring.config.additional-location=file:/etc/shinyproxy/application.yml
 Restart=on-failure
+RestartSec=3
 
 [Install]
 WantedBy=multi-user.target
 UNIT
 
-# Install Quarto
 log "Installing Quarto"
-QUARTO_VERSION="1.8.24"
-wget -q \
-  "https://github.com/quarto-dev/quarto-cli/releases/download/v${QUARTO_VERSION}/quarto-${QUARTO_VERSION}-linux-amd64.deb" \
-  -O /tmp/quarto.deb
-apt-get install -y /tmp/quarto.deb
 
-# Install code-server (provides VS Code in a browser)
-# the service intentionally disabled in the golden image
-# Cloud-init later:
-# - Writes the participant-specific password.
-# - Starts the service.
-# - Enables it for future boots.
+readonly QUARTO_VERSION="1.8.24"
+readonly QUARTO_DEB="/tmp/quarto.deb"
+
+wget --quiet \
+  --output-document="$QUARTO_DEB" \
+  "https://github.com/quarto-dev/quarto-cli/releases/download/v${QUARTO_VERSION}/quarto-${QUARTO_VERSION}-linux-amd64.deb"
+apt-get install -y "$QUARTO_DEB"
+rm -f "$QUARTO_DEB"
+quarto check
+
 log "Installing code-server"
-curl -fsSL https://code-server.dev/install.sh -o /tmp/install-code-server.sh
+
+curl --fail --silent --show-error --location \
+  https://code-server.dev/install.sh \
+  --output /tmp/install-code-server.sh
 sh /tmp/install-code-server.sh
-systemctl disable code-server@student 2>/dev/null || true
+rm -f /tmp/install-code-server.sh
 
 cat > /home/student/.config/code-server/config.yaml <<'YAML'
 bind-addr: 127.0.0.1:8080
@@ -267,14 +386,10 @@ YAML
 chown student:student /home/student/.config/code-server/config.yaml
 chmod 0600 /home/student/.config/code-server/config.yaml
 
-# Configuring Nginx (VM's public gateway)
-# Enables WebSocket proxying for interactive services such as code-server
-# and Shiny.
-#
-# Certbot is installed and its renewal timer is enabled, but no certificate
-# is issued here because the hostname is not known until provisioning.
+# Participant provisioning supplies the password and enables this service.
+systemctl disable --now code-server@student.service 2>/dev/null || true
 
-log "Configuring default Nginx site"
+log "Configuring Nginx"
 
 cat > /etc/nginx/sites-available/dsi-workshop <<'NGINX'
 map $http_upgrade $connection_upgrade {
@@ -298,7 +413,6 @@ server {
         index index.html;
     }
 
-    # FastAPI is installed or enabled later. Until then, requests to /api/ will receive a 502 response.
     location /api/ {
         proxy_pass http://127.0.0.1:8000/;
         proxy_set_header Host $host;
@@ -347,104 +461,62 @@ server {
 NGINX
 
 rm -f /etc/nginx/sites-enabled/default
-
 ln -sfn \
   /etc/nginx/sites-available/dsi-workshop \
   /etc/nginx/sites-enabled/dsi-workshop
-
 nginx -t
 
-log "Enabling image services"
+log "Starting and validating image services"
 
 systemctl daemon-reload
-systemctl enable --now shiny-server shinyproxy
-systemctl enable --now nginx certbot.timer
+systemctl enable --now \
+  certbot.timer \
+  docker.service \
+  nginx.service \
+  postgresql.service \
+  shiny-server.service \
+  shinyproxy.service
 
-log "Waiting for ShinyProxy"
-
-shinyproxy_ready=false
-
-for attempt in $(seq 1 30); do
-  if curl \
-      --fail \
-      --silent \
-      --output /dev/null \
-      http://127.0.0.1:8081/; then
-    shinyproxy_ready=true
-    echo "ShinyProxy is ready"
-    break
-  fi
-
-  if ! systemctl is-active --quiet shinyproxy; then
-    echo "ERROR: ShinyProxy failed during startup" >&2
-    journalctl -u shinyproxy -n 100 --no-pager
-    exit 1
-  fi
-
-  sleep 2
-done
-
-if [[ "$shinyproxy_ready" != true ]]; then
-  echo "ERROR: ShinyProxy readiness timeout" >&2
-  journalctl -u shinyproxy -n 100 --no-pager
-  exit 1
-fi
-
-# validate fastapi
-log "Preparing FastAPI workshop account"
-# Validate only the account and directories created by this image.
-# The participant provisioning process installs or enables the service later.
-id fastapi >/dev/null
-test "$(getent passwd fastapi | cut -d: -f6)" = "/home/fastapi"
-test "$(getent passwd fastapi | cut -d: -f7)" = "/usr/sbin/nologin"
-
-test -d /home/fastapi/.config/dsi
-test "$(stat -c '%U:%G' /home/fastapi/.config/dsi)" = "fastapi:fastapi"
-test "$(stat -c '%a' /home/fastapi/.config/dsi)" = "700"
-
-# If a FastAPI unit was installed elsewhere in the image build, make sure it
-# remains stopped and disabled. Do nothing if the unit does not yet exist.
-if systemctl list-unit-files --no-legend dsi-fastapi.service 2>/dev/null |
-    grep -q '^dsi-fastapi\.service'; then
-  systemctl disable --now dsi-fastapi.service
-
-  if systemctl is-failed --quiet dsi-fastapi.service; then
-    systemctl reset-failed dsi-fastapi.service
-  fi
-fi
-
-# Restart and validate image services
-log "Restarting and validating image services"
-systemctl restart postgresql nginx
-
-# check listening ports
-curl \
-  --fail \
-  --silent \
-  --output /dev/null \
-  http://127.0.0.1:3838/
-
-curl \
-  --fail \
-  --silent \
-  --output /dev/null \
-  http://127.0.0.1:8081/
-
-check_listening_port() {
-  local port="$1"
-  local service="$2"
-
-  if ! ss -lnt | grep -qE "LISTEN.+127\\.0\\.0\\.1:${port}"; then
-    echo "ERROR: ${service} is not listening on 127.0.0.1:${port}" >&2
-    return 1
-  fi
-}
+wait_for_http http://127.0.0.1:3838/ shiny-server
+wait_for_http http://127.0.0.1:8081/ shinyproxy
 
 check_listening_port 3838 "Shiny Server"
 check_listening_port 8081 "ShinyProxy"
 check_listening_port 9090 "ShinyProxy management endpoint"
 
-echo "Image service validation completed successfully"
+log "Validating FastAPI service and Nginx route"
 
-# done
+# Start and validate FastAPI using the same unit participants will enable.
+# Leave it stopped and disabled in the finished golden image.
+systemctl start dsi-fastapi.service
+wait_for_http http://127.0.0.1:8000/healthz dsi-fastapi
+check_listening_port 8000 "FastAPI"
+curl --fail --silent --show-error --output /dev/null \
+  http://127.0.0.1/api/healthz
+
+# Validate the unit identity while it is loaded and known to systemd.
+[[ "$(systemctl show dsi-fastapi.service --property=User --value)" == "fastapi" ]]
+[[ "$(systemctl show dsi-fastapi.service --property=Group --value)" == "fastapi" ]]
+
+systemctl disable --now dsi-fastapi.service
+systemctl reset-failed dsi-fastapi.service || true
+fastapi_enablement="$(systemctl is-enabled dsi-fastapi.service 2>/dev/null || true)"
+[[ "$fastapi_enablement" == "disabled" ]] ||
+  fail "dsi-fastapi.service should be disabled, found: ${fastapi_enablement:-unknown}"
+! systemctl is-active --quiet dsi-fastapi.service ||
+  fail "dsi-fastapi.service should be stopped in the golden image"
+
+log "Validating workshop accounts and permissions"
+
+[[ "$(getent passwd fastapi | cut -d: -f6)" == "/home/fastapi" ]]
+[[ "$(getent passwd fastapi | cut -d: -f7)" == "/usr/sbin/nologin" ]]
+[[ "$(stat -c '%U:%G' /home/fastapi/.config/dsi)" == "fastapi:fastapi" ]]
+[[ "$(stat -c '%a' /home/fastapi/.config/dsi)" == "700" ]]
+
+log "Cleaning package caches"
+
+apt-get autoremove -y
+apt-get clean
+rm -rf /var/lib/apt/lists/*
+
 log "Golden-image build completed"
