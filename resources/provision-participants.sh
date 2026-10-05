@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# set default permissions
 umask 077
 
+# work inside workshop context
 doctl auth init --context workshop
 doctl auth switch --context workshop
 
@@ -19,8 +21,53 @@ do
   require_command "$command"
 done
 
-cd resources/
+wait_for_ssh() {
+  local ip=$1
+  local private_key=$2
 
+  for attempt in $(seq 1 60); do
+    if ssh -i "$private_key" \
+      -o BatchMode=yes \
+      -o StrictHostKeyChecking=accept-new \
+      -o ConnectTimeout=5 \
+      "student@${ip}" true 2>/dev/null; then
+      return 0
+    fi
+    sleep 10
+  done
+
+  echo "ERROR: SSH did not become available on ${ip}."
+  return 1
+}
+
+wait_for_dns() {
+  local hostname=$1
+  local expected_ip=$2
+  local resolved_ips
+
+  for attempt in $(seq 1 60); do
+    resolved_ips=$(dig +short A "$hostname" | sort -u)
+
+    if grep -Fxq "$expected_ip" <<< "$resolved_ips"; then
+      echo "DNS ready: ${hostname} -> ${expected_ip}"
+      return 0
+    fi
+
+    echo "Waiting for DNS: ${hostname} (${attempt}/60)"
+    sleep 10
+  done
+
+  echo "ERROR: ${hostname} did not resolve to ${expected_ip}." >&2
+  return 1
+}
+
+[ -f "$TEMPLATE" ] || {
+  echo "ERROR: Missing template: $TEMPLATE"
+  exit 1
+}
+
+# variables
+cd resources/
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG_FILE="${1:-${SCRIPT_DIR}/workshop.env}"
 [[ -r "$CONFIG_FILE" ]] || {
@@ -70,51 +117,7 @@ PROJECT_ID=$(doctl projects list --format ID,Name --no-header \
   exit 1
 }
 
-wait_for_ssh() {
-  local ip=$1
-  local private_key=$2
-
-  for attempt in $(seq 1 60); do
-    if ssh -i "$private_key" \
-      -o BatchMode=yes \
-      -o StrictHostKeyChecking=accept-new \
-      -o ConnectTimeout=5 \
-      "student@${ip}" true 2>/dev/null; then
-      return 0
-    fi
-    sleep 10
-  done
-
-  echo "ERROR: SSH did not become available on ${ip}."
-  return 1
-}
-
-wait_for_dns() {
-  local hostname=$1
-  local expected_ip=$2
-  local resolved_ips
-
-  for attempt in $(seq 1 60); do
-    resolved_ips=$(dig +short A "$hostname" | sort -u)
-
-    if grep -Fxq "$expected_ip" <<< "$resolved_ips"; then
-      echo "DNS ready: ${hostname} -> ${expected_ip}"
-      return 0
-    fi
-
-    echo "Waiting for DNS: ${hostname} (${attempt}/60)"
-    sleep 10
-  done
-
-  echo "ERROR: ${hostname} did not resolve to ${expected_ip}." >&2
-  return 1
-}
-
-[ -f "$TEMPLATE" ] || {
-  echo "ERROR: Missing template: $TEMPLATE"
-  exit 1
-}
-
+# env check
 for variable in SSH_KEY_ID VPC_UUID SNAPSHOT_ID PROJECT_ID; do
   [[ -n "${!variable:-}" ]] || {
     echo "ERROR: Could not resolve $variable" >&2
@@ -133,20 +136,22 @@ done
   exit 1
 }
 
+# secret handling
 mkdir -p "$CONFIG_DIR"
 chmod 700 "$CONFIG_DIR"
-touch .gitignore
+touch ../.gitignore
 if ! grep -Fxq "${CONFIG_DIR}/" ../.gitignore; then
   printf '%s/\n' "$(basename "$CONFIG_DIR")" >> ../.gitignore
 fi
 
 if [[ ! -e "$ACCESS_FILE" ]]; then
   printf '%s\n' \
-    "vm_name,droplet_id,public_ip,hostname,code_password,db_password,ssh_private_key" \
+    "vm_name,droplet_id,public_ip,hostname,ssh_password,code_password,db_password" \
     > "$ACCESS_FILE"
 fi
 chmod 600 "$ACCESS_FILE"
 
+# domain check
 if [ "$CREATE_DIGITALOCEAN_DNS" = true ]; then
   if ! doctl compute domain list --no-header \
       | grep -Fq "$DOMAIN"; then
@@ -167,6 +172,7 @@ for number in $(seq 1 "$PARTICIPANT_COUNT"); do
   echo "Provisioning ${vm_name} as ${participant_hostname}"
   trap 'echo "Provisioning failed for $participant_id" >&2' ERR
 
+  ## auth
   if [ ! -f "$private_key" ]; then
     ssh-keygen -t ed25519 -a 100 -N "" \
       -C "${vm_name}-workshop" -f "$private_key"
@@ -177,10 +183,13 @@ for number in $(seq 1 "$PARTICIPANT_COUNT"); do
   participant_ssh_public_key=$(cat "$public_key")
   db_password=$(openssl rand -hex 24)
   code_password=$(openssl rand -hex 16)
+  ssh_password=$(openssl rand -base64 12)
 
+  # create participant cloud-init
   PARTICIPANT_ID="$participant_id" \
   PARTICIPANT_HOSTNAME="$participant_hostname" \
   PARTICIPANT_SSH_PUBLIC_KEY="$participant_ssh_public_key" \
+  PARTICIPANT_SSH_PASSWORD="$ssh_password" \
   CODE_PASSWORD="$code_password" \
   DB_PASSWORD="$db_password" \
   TEMPLATE="$TEMPLATE" \
@@ -194,6 +203,7 @@ replacements = {
     "__PARTICIPANT_ID__": os.environ["PARTICIPANT_ID"],
     "__PARTICIPANT_HOSTNAME__": os.environ["PARTICIPANT_HOSTNAME"],
     "__PARTICIPANT_SSH_PUBLIC_KEY__": os.environ["PARTICIPANT_SSH_PUBLIC_KEY"],
+    "__PARTICIPANT_SSH_PASSWORD__": os.environ["PARTICIPANT_SSH_PASSWORD"],
     "__CODE_PASSWORD__": os.environ["CODE_PASSWORD"],
     "__DB_PASSWORD__": os.environ["DB_PASSWORD"],
 }
@@ -335,8 +345,8 @@ PY
 
   printf '%s,%s,%s,%s,%s,%s,%s\n' \
     "$vm_name" "$droplet_id" "$public_ip" \
-    "$participant_hostname" "$code_password" "$db_password" \
-    "$private_key" >> "$ACCESS_FILE"
+    "$participant_hostname" "$ssh_password" \
+    "$code_password" "$db_password"  >> "$ACCESS_FILE"
 
   echo "Ready: https://${participant_hostname}/"
 done

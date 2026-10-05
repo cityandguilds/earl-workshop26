@@ -9,9 +9,8 @@ users:
       - sudo
       - docker
     sudo: "ALL=(ALL) NOPASSWD:ALL"
-    lock_passwd: true
-    ssh_authorized_keys:
-      - __PARTICIPANT_SSH_PUBLIC_KEY__
+    lock_passwd: false
+    plain_text_passwd: "__PARTICIPANT_SSH_PASSWORD__"
 
 package_update: false
 package_upgrade: false
@@ -36,8 +35,8 @@ write_files:
     owner: root:root
     permissions: "0644"
     content: |
-      PasswordAuthentication no
-      KbdInteractiveAuthentication no
+      PasswordAuthentication yes
+      KbdInteractiveAuthentication yes
       PubkeyAuthentication yes
       PermitRootLogin prohibit-password
 
