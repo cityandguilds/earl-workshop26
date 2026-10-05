@@ -15,10 +15,10 @@ Welcome to the workshop. Today you will work through a small, connected data pla
 ## Who are we?
 80% of City & Guilds' Data Science team.
 
-Stephen Price
-Nela Morris
-Alison Telford
-Sam Anees-Hill
+- Stephen Price  
+- Nela Morris
+- Alison Telford
+- Sam Anees-Hill
 
 ## Who are you?!
 Skills audit
