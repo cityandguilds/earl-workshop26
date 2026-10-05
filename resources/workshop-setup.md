@@ -620,6 +620,7 @@ sudo -H -u student bash -c '
 Both VM types use the same DigitalOcean project, VPC, golden-image snapshot, monitoring, and broadly similar machine specification. Their first-boot configuration is kept separate.
 
 ### Participant VMs
+`provision-participants.sh` utilises `cloud-init-template.yml` to provision participant VMs as follows:
 
 - One VM per participant, using the `student` account.
 - Generate unique SSH, code-server, and PostgreSQL credentials.
@@ -629,9 +630,10 @@ Both VM types use the same DigitalOcean project, VPC, golden-image snapshot, mon
 - Record generated credentials in the protected participant access file.
 
 ### Workshop admin VM
+`provision-admin.sh` defines cloud-init with a heredoc when provisioning the workshop admin VM as follows:
 
 - One shared VM at `workshop.earl.sjp-analytics.co.uk`.
-- Create `workshopadmin`, `sam`, `ali`, and `nel`.
+- Create admin and user accounts.
 - Allow key-only SSH from any source IP, with root and password login disabled.
 - Install `uv` and Python 3.13.
 - Clone and deploy the FastAPI workshop portal.
@@ -642,6 +644,8 @@ Both VM types use the same DigitalOcean project, VPC, golden-image snapshot, mon
 - Do not configure participant-specific PostgreSQL, code-server, Shiny, or ShinyProxy services.
 
 The participant cloud-init template should therefore remain participant-specific, while the admin VM uses separate provisioning tailored to hosting and administering the workshop portal.
+
+First site admin user created as follows:
 
 ```bash
 ssh -t -i "${PRIVATE_KEY}" \
@@ -654,6 +658,8 @@ ssh -t -i "${PRIVATE_KEY}" \
     exec .venv/bin/earl-workshop create-admin
   '"
 ```
+
+which will then prompt for 'Administrator username' and 'Administrator password'.
 
 # Updating the golden image
 
