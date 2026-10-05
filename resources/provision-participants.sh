@@ -227,11 +227,12 @@ PY
 
   existing_id=$(doctl compute droplet list --format ID,Name --no-header \
     | awk -v name="$vm_name" '$2 == name {print $1; exit}')
-  if [ -n "$existing_id" ]; then
-    echo "ERROR: Droplet ${vm_name} already exists as ${existing_id}."
-    exit 1
-  fi
 
+  if [ -n "$existing_id" ]; then
+    echo "Skipping ${vm_name}: already exists as ${existing_id}"
+    continue
+  fi
+  
   doctl compute droplet create "$vm_name" \
     --region "$REGION" \
     --size "$PARTICIPANT_SIZE" \
