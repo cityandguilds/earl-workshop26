@@ -111,7 +111,7 @@ def test_login_logout_and_signed_cookie_configuration(tmp_path: Path) -> None:
     add_user(app, username="Admin", password="admin password", role=UserRole.ADMIN)
     client = TestClient(app, base_url="https://testserver", follow_redirects=False)
 
-    assert client.get("/admin").status_code == 401
+    assert client.get("/admin").status_code == 303
     login_page = client.get("/login")
     assert login_page.status_code == 200
     cookie = login_page.headers["set-cookie"].lower()
@@ -135,9 +135,9 @@ def test_login_logout_and_signed_cookie_configuration(tmp_path: Path) -> None:
     logout_token = csrf_from(client.get("/admin/protected"))
     logout = client.post("/logout", data={"csrf_token": logout_token}, follow_redirects=False)
     assert logout.status_code == 303
-    assert client.get("/admin").status_code == 401
+    assert client.get("/admin").status_code == 303
     client.cookies.set("earl_workshop_session", old_signed_cookie)
-    assert client.get("/admin").status_code == 401
+    assert client.get("/admin").status_code == 303
 
 
 @pytest.mark.parametrize(
@@ -214,7 +214,7 @@ def test_inactive_account_and_unknown_account_have_safe_login_failure(tmp_path: 
     assert inactive.status_code == unknown.status_code == 401
     assert "Invalid username or password" in inactive.text
     assert "Invalid username or password" in unknown.text
-    assert client.get("/portal").status_code == 401
+    assert client.get("/portal").status_code == 303
 
 
 def test_role_guards_are_enforced_server_side(tmp_path: Path) -> None:

@@ -107,7 +107,7 @@ def test_course_page_is_rendered_from_loaded_content(tmp_path: Path) -> None:
 
     anonymous = client.get("/course/install-software", follow_redirects=False)
     assert anonymous.status_code == 303
-    assert anonymous.headers["location"] == "/login?next=%2Fcourse%2Finstall-software"
+    assert anonymous.headers["location"] == "/login?next=%2Fcourse%2Finstall-software&reauth=1"
     with client.app.state.session_factory() as session:
         create_user(
             session,
@@ -131,7 +131,7 @@ def test_course_page_is_rendered_from_loaded_content(tmp_path: Path) -> None:
     response = client.get("/course/install-software")
 
     assert response.status_code == 200
-    assert "Install software on a virtual machine" in response.text
+    assert "Install software, system libraries, etc." in response.text
     assert "<h2>What you will learn</h2>" in response.text
     assert "sudo apt update" in re.sub(r"<[^>]+>", "", response.text)
     assert 'href="/static/code-highlight.css"' in response.text

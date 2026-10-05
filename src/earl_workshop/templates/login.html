@@ -6,10 +6,12 @@
 <section class="auth-card" aria-labelledby="login-title">
   <h1 id="login-title">Sign in</h1>
   <p>Use your sign-in username, not your display name.</p>
+  {% if reauth %}<p role="status">Please sign in again to continue.</p>{% endif %}
   {% if login_error %}<p class="form-error" role="alert">{{ login_error }}</p>{% endif %}
   <form method="post" action="/login" class="auth-form">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <input type="hidden" name="next_path" value="{{ next_path }}">
+    {% if reauth %}<input type="hidden" name="reauth" value="1">{% endif %}
     <label for="username">Sign-in username</label>
     <input id="username" name="username" type="text" autocomplete="username" required>
     <label for="password">Password</label>

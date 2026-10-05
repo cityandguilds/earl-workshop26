@@ -25,6 +25,11 @@
             credentials: "same-origin",
             headers: { Accept: "text/plain" },
           });
+          if (response.status === 401) {
+            const next = window.location.pathname + window.location.search + window.location.hash;
+            window.location.assign(`/login?next=${encodeURIComponent(next)}&reauth=1`);
+            return;
+          }
           if (!response.ok) throw new Error("Credential unavailable");
           value = await response.text();
         } catch (_error) {

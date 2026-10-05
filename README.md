@@ -169,7 +169,14 @@ Create the first administrator from an interactive terminal. The password is pro
 EARL_WORKSHOP_DATA_DIR=.data uv run earl-workshop create-admin
 ```
 
-The command prompts for a username, password, and confirmation. Portal roles are `admin` and `attendee`; administrator-only server routes return an authorization failure to attendees and anonymous requests. Login errors intentionally use one generic message, and inactive accounts cannot establish a session. Login and logout forms carry a token bound to the signed session; missing or invalid CSRF tokens are rejected.
+The command prompts for a username, password, and confirmation. Portal roles are `admin` and `attendee`; administrator-only server routes return an authorization failure to signed-in attendees. Login errors intentionally use one generic message, and inactive accounts cannot establish a session. Login and logout forms carry a token bound to the signed session; missing or invalid CSRF tokens in a live session are rejected.
+
+Protected pages and form submissions redirect signed-out users to login with “Please sign in
+again to continue.” After login, users return to the relevant page; expired submissions are
+never replayed and must be entered again. Saved course progress remains intact. An expired
+login form opens a fresh sign-in form, and an expired logout returns to login. Copying a VM
+password also opens login if the session has expired. Recovery happens on the next interaction;
+the existing eight-hour session lifetime is unchanged.
 
 An attendee signs in with their unique username, not their optional display name. The display name is for presentation in the administrator area and is not unique enough to authenticate with.
 
