@@ -154,7 +154,7 @@ def test_admin_account_lifecycle_and_csrf_are_browser_protected(tmp_path: Path) 
         assert attendee is not None and not attendee.is_active
 
     attendee_client = TestClient(app, follow_redirects=False)
-    assert attendee_client.get("/admin").status_code == 401
+    assert attendee_client.get("/admin").status_code == 303
     login_page = attendee_client.get("/login")
     login_response = attendee_client.post(
         "/login",

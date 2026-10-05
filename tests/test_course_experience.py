@@ -66,7 +66,7 @@ def test_authenticated_course_index_groups_pages_and_shows_progress(tmp_path: Pa
 
     anonymous = client.get("/course")
     assert anonymous.status_code == 303
-    assert anonymous.headers["location"] == "/login?next=%2Fcourse"
+    assert anonymous.headers["location"] == "/login?next=%2Fcourse&reauth=1"
     login(client, "attendee", "attendee password")
 
     index = client.get("/course")
@@ -97,7 +97,7 @@ def test_anonymous_course_login_returns_to_requested_page_even_after_failure(
         client = TestClient(app, follow_redirects=False)
         redirect = client.get(destination)
         assert redirect.status_code == 303
-        assert redirect.headers["location"] == f"/login?next={quote(destination, safe='')}"
+        assert redirect.headers["location"] == f"/login?next={quote(destination, safe='')}&reauth=1"
         login_page = client.get(redirect.headers["location"])
         assert login_page.status_code == 200
         assert f'name="next_path" value="{destination}"' in login_page.text
@@ -118,7 +118,7 @@ def test_anonymous_course_login_returns_to_requested_page_even_after_failure(
         assert client.get(destination).status_code == 200
 
 
-def test_expired_course_session_redirects_without_redirecting_protected_posts(
+def test_revoked_course_session_redirects_pages_and_protected_posts(
     tmp_path: Path,
 ) -> None:
     app = create_app(settings_for(tmp_path))
@@ -132,8 +132,8 @@ def test_expired_course_session_redirects_without_redirecting_protected_posts(
 
     response = client.get("/course/orientation")
     assert response.status_code == 303
-    assert response.headers["location"] == "/login?next=%2Fcourse%2Forientation"
-    assert client.post("/course/orientation/completion").status_code == 401
+    assert response.headers["location"] == "/login?next=%2Fcourse%2Forientation&reauth=1"
+    assert client.post("/course/orientation/completion").status_code == 303
     assert client.get("/attendee/credentials/password").status_code == 401
 
 

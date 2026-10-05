@@ -139,7 +139,7 @@ def test_anonymous_and_unassigned_attendees_are_safe(tmp_path: Path) -> None:
     add_attendee(app, "waiting", "waiting-password")
 
     anonymous = TestClient(app)
-    assert anonymous.get("/attendee").status_code == 401
+    assert anonymous.get("/attendee", follow_redirects=False).status_code == 303
     assert anonymous.get("/attendee/credentials/password").status_code == 401
 
     client = TestClient(app)

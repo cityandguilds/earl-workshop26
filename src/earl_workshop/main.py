@@ -27,6 +27,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from . import __version__
 from .auth import (
+    SESSION_CSRF_KEY,
     authenticate_user,
     create_user,
     csrf_token,
@@ -127,14 +128,41 @@ def _safe_next_path(next_path: str | None) -> str:
     return "/"
 
 
-def _login_redirect(request: Request) -> RedirectResponse:
-    """Ask a course visitor to sign in, then return to the requested page."""
+class LoginRequired(Exception):
+    """Send an unauthenticated browser back through the login page."""
 
-    next_path = request.url.path
-    if request.url.query:
-        next_path += f"?{request.url.query}"
+    def __init__(self, next_path: str | None = None) -> None:
+        self.next_path = next_path
+
+
+def _require_browser_user(
+    db: Session,
+    request: Request,
+    role: UserRole | None = None,
+    *,
+    next_path: str | None = None,
+) -> User:
+    """Use browser navigation for authentication failures, preserving role errors."""
+
+    try:
+        if role is not None:
+            return require_role(db, request, role)
+        return require_authenticated_user(db, request)
+    except HTTPException as exc:
+        if exc.status_code != status.HTTP_401_UNAUTHORIZED:
+            raise
+        raise LoginRequired(next_path) from exc
+
+
+def _login_redirect(request: Request, next_path: str | None = None) -> RedirectResponse:
+    """Ask a browser to sign in again, then return to a safe page."""
+
+    if next_path is None:
+        next_path = request.url.path
+        if request.url.query:
+            next_path += f"?{request.url.query}"
     return RedirectResponse(
-        url=f"/login?next={quote(next_path, safe='')}",
+        url=f"/login?next={quote(_safe_next_path(next_path), safe='')}&reauth=1",
         status_code=status.HTTP_303_SEE_OTHER,
     )
 
@@ -304,6 +332,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         https_only=runtime_settings.secure_cookies,
     )
 
+    @app.exception_handler(LoginRequired)
+    async def login_required_handler(request: Request, exc: LoginRequired) -> RedirectResponse:
+        return _login_redirect(request, exc.next_path)
+
     static_dir = Path(__file__).parent / "static"
     app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
@@ -373,9 +405,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/course", response_class=HTMLResponse)
     async def course_index(request: Request, db: Session = Depends(get_db)) -> Response:
-        user = current_user(db, request)
-        if user is None:
-            return _login_redirect(request)
+        user = _require_browser_user(db, request)
         context = _template_context(
             request, settings=runtime_settings, workshop=workshop, user=user
         )
@@ -387,6 +417,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def login_page(
         request: Request,
         next_path: str | None = Query(default=None, alias="next"),
+        reauth: str = Query(default=""),
         db: Session = Depends(get_db),
     ) -> Response:
         user = current_user(db, request)
@@ -396,6 +427,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             )
         context = _template_context(request, settings=runtime_settings, workshop=workshop)
         context["next_path"] = _safe_next_path(next_path)
+        context["reauth"] = reauth == "1"
         return templates.TemplateResponse(request=request, name="login.html", context=context)
 
     @app.post("/login", response_class=HTMLResponse)
@@ -405,13 +437,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         password: str = Form(default=""),
         submitted_csrf_token: str = Form(default="", alias="csrf_token"),
         next_path: str = Form(default="/"),
+        reauth: str = Form(default=""),
         db: Session = Depends(get_db),
     ) -> Response:
+        if submitted_csrf_token and not request.session.get(SESSION_CSRF_KEY):
+            return _login_redirect(request, next_path)
         validate_csrf(request, submitted_csrf_token)
         user = authenticate_user(db, username=username, password=password)
         if user is None:
             context = _template_context(request, settings=runtime_settings, workshop=workshop)
             context["next_path"] = _safe_next_path(next_path)
+            context["reauth"] = reauth == "1"
             context["login_error"] = "Invalid username or password"
             return templates.TemplateResponse(
                 request=request, name="login.html", context=context, status_code=401
@@ -432,13 +468,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         # Resolve the account before mutating the session so stale/inactive cookies are
         # invalidated through the same route as an explicit logout.
         user = current_user(db, request)
+        if user is None:
+            return _login_redirect(request, "/")
         validate_csrf(request, submitted_csrf_token)
         invalidate_session(request, db, user)
         return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
 
     @app.get("/portal", response_class=HTMLResponse)
     async def portal_page(request: Request, db: Session = Depends(get_db)) -> Response:
-        user = require_authenticated_user(db, request)
+        user = _require_browser_user(db, request)
         if user.role == UserRole.ATTENDEE.value:
             return _attendee_dashboard_response(request, db, user)
         context = _template_context(
@@ -491,7 +529,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         notice: str | None = Query(default=None),
         db: Session = Depends(get_db),
     ) -> Response:
-        user = require_role(db, request, UserRole.ADMIN)
+        user = _require_browser_user(db, request, UserRole.ADMIN)
         return _admin_page_response(request, db, user, notice=notice)
 
     @app.post("/admin/attendees/create", response_class=HTMLResponse)
@@ -504,7 +542,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         submitted_csrf_token: str = Form(default="", alias="csrf_token"),
         db: Session = Depends(get_db),
     ) -> Response:
-        admin = require_role(db, request, UserRole.ADMIN)
+        admin = _require_browser_user(db, request, UserRole.ADMIN, next_path="/admin")
         validate_csrf(request, submitted_csrf_token)
         form_values = {
             "attendee_username": username,
@@ -562,7 +600,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         submitted_csrf_token: str = Form(default="", alias="csrf_token"),
         db: Session = Depends(get_db),
     ) -> Response:
-        admin = require_role(db, request, UserRole.ADMIN)
+        admin = _require_browser_user(db, request, UserRole.ADMIN, next_path="/admin")
         validate_csrf(request, submitted_csrf_token)
         attendee = _attendee_or_404(db, attendee_id)
         replacement = new_password or password
@@ -595,7 +633,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         submitted_csrf_token: str = Form(default="", alias="csrf_token"),
         db: Session = Depends(get_db),
     ) -> Response:
-        admin = require_role(db, request, UserRole.ADMIN)
+        admin = _require_browser_user(db, request, UserRole.ADMIN, next_path="/admin")
         validate_csrf(request, submitted_csrf_token)
         attendee = _attendee_or_404(db, attendee_id)
         normalized_display_name = display_name.strip()
@@ -621,7 +659,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         submitted_csrf_token: str = Form(default="", alias="csrf_token"),
         db: Session = Depends(get_db),
     ) -> Response:
-        admin = require_role(db, request, UserRole.ADMIN)
+        admin = _require_browser_user(db, request, UserRole.ADMIN, next_path="/admin")
         validate_csrf(request, submitted_csrf_token)
         attendee = _attendee_or_404(db, attendee_id)
         requested = active or is_active or action
@@ -655,7 +693,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         submitted_csrf_token: str = Form(default="", alias="csrf_token"),
         db: Session = Depends(get_db),
     ) -> Response:
-        admin = require_role(db, request, UserRole.ADMIN)
+        admin = _require_browser_user(db, request, UserRole.ADMIN, next_path="/admin")
         validate_csrf(request, submitted_csrf_token)
         form_values = {"vm_host": host, "vm_ssh_username": ssh_username}
         if password_confirmation and password_confirmation != ssh_password:
@@ -699,7 +737,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         submitted_csrf_token: str = Form(default="", alias="csrf_token"),
         db: Session = Depends(get_db),
     ) -> Response:
-        admin = require_role(db, request, UserRole.ADMIN)
+        admin = _require_browser_user(db, request, UserRole.ADMIN, next_path="/admin")
         validate_csrf(request, submitted_csrf_token)
         credential = db.get(VMCredential, vm_credential_id)
         if credential is None:
@@ -747,7 +785,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         submitted_csrf_token: str = Form(default="", alias="csrf_token"),
         db: Session = Depends(get_db),
     ) -> Response:
-        admin = require_role(db, request, UserRole.ADMIN)
+        admin = _require_browser_user(db, request, UserRole.ADMIN, next_path="/admin")
         validate_csrf(request, submitted_csrf_token)
         selected_attendee_id = attendee_id or assigned_attendee_id
         try:
@@ -783,7 +821,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         show_credentials: bool = Query(default=False),
         db: Session = Depends(get_db),
     ) -> Response:
-        user = require_role(db, request, UserRole.ATTENDEE)
+        user = _require_browser_user(db, request, UserRole.ATTENDEE)
         return _attendee_dashboard_response(request, db, user, show_credentials=show_credentials)
 
     @app.get("/attendee/credentials/password", response_class=PlainTextResponse)
@@ -830,9 +868,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def course_page(
         request: Request, page_id: str, db: Session = Depends(get_db)
     ) -> Response:
-        user = current_user(db, request)
-        if user is None:
-            return _login_redirect(request)
+        user = _require_browser_user(db, request)
         page = next((candidate for candidate in workshop.pages if candidate.id == page_id), None)
         if page is None:
             raise HTTPException(status_code=404, detail="Course page not found")
@@ -873,7 +909,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         submitted_csrf_token: str = Form(default="", alias="csrf_token"),
         db: Session = Depends(get_db),
     ) -> RedirectResponse:
-        user = require_authenticated_user(db, request)
+        user = _require_browser_user(db, request, next_path=f"/course/{page_id}")
         validate_csrf(request, submitted_csrf_token)
         page = next((candidate for candidate in workshop.pages if candidate.id == page_id), None)
         if page is None:
