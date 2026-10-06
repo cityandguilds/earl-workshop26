@@ -61,11 +61,6 @@ wait_for_dns() {
   return 1
 }
 
-[ -f "$TEMPLATE" ] || {
-  echo "ERROR: Missing template: $TEMPLATE"
-  exit 1
-}
-
 # variables
 cd resources/
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -82,7 +77,7 @@ source "$CONFIG_FILE"
 : "${SNAPSHOT_NAME:?Missing SNAPSHOT_NAME}"
 : "${PROJECT_NAME:?Missing PROJECT_NAME}"
 
-: "${PARTICIPANT_COUNT:=9}"
+: "${PARTICIPANT_COUNT:=14}"
 : "${CREATE_DIGITALOCEAN_DNS:=true}"
 : "${CERTBOT_STAGING:=false}" #! true for testing
 
@@ -91,6 +86,11 @@ CONFIG_DIR="${SCRIPT_DIR}/../participant-config"
 ACCESS_FILE="${CONFIG_DIR}/access-details.csv"
 
 PYTHON="${SCRIPT_DIR}/.venv/bin/python"
+
+[ -f "$TEMPLATE" ] || {
+  echo "ERROR: Missing template: $TEMPLATE"
+  exit 1
+}
 
 SSH_KEY_ID=$(doctl compute ssh-key list \
   --format ID,Name --no-header \
@@ -232,7 +232,7 @@ PY
     echo "Skipping ${vm_name}: already exists as ${existing_id}"
     continue
   fi
-  
+
   doctl compute droplet create "$vm_name" \
     --region "$REGION" \
     --size "$PARTICIPANT_SIZE" \

@@ -1,5 +1,4 @@
 #cloud-config
-
 users:
   - default
   - name: student
@@ -11,6 +10,8 @@ users:
     sudo: "ALL=(ALL) NOPASSWD:ALL"
     lock_passwd: false
     plain_text_passwd: "__PARTICIPANT_SSH_PASSWORD__"
+    ssh_authorized_keys:
+      - "__PARTICIPANT_SSH_PUBLIC_KEY__"
 
 package_update: false
 package_upgrade: false
@@ -216,10 +217,10 @@ write_files:
       SSHD_CONFIG=$(/usr/sbin/sshd -T)
 
       test "$(awk '/^passwordauthentication / {print $2; exit}' \
-        <<<"$SSHD_CONFIG")" = "no"
+        <<<"$SSHD_CONFIG")" = "yes"
 
       test "$(awk '/^kbdinteractiveauthentication / {print $2; exit}' \
-        <<<"$SSHD_CONFIG")" = "no"
+        <<<"$SSHD_CONFIG")" = "yes"
 
       test "$(awk '/^pubkeyauthentication / {print $2; exit}' \
         <<<"$SSHD_CONFIG")" = "yes"

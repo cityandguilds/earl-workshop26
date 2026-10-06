@@ -151,3 +151,5 @@ if ! doctl compute firewall list \
     --outbound-rules \
       "protocol:icmp,address:0.0.0.0/0,address:::0/0 protocol:tcp,ports:all,address:0.0.0.0/0,address:::0/0 protocol:udp,ports:all,address:0.0.0.0/0,address:::0/0"
 fi
+
+doctl compute firewall list

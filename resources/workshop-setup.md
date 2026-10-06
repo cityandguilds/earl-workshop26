@@ -509,7 +509,7 @@ Do not develop the automation using production certificates. First test with one
 
 ```bash
 PARTICIPANT_COUNT=1
-CERTBOT_STAGING=false
+CERTBOT_STAGING=true
 ```
 
 A staging certificate intentionally produces a browser trust warning. Once the complete workflow succeeds, delete the disposable test Droplet and DNS record, then provision the real class with appropriate `PARTICIPANT_COUNT` (9) and with `CERTBOT_STAGING=false`.

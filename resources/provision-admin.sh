@@ -97,8 +97,28 @@ fi
 chmod 600 "$PRIVATE_KEY"
 chmod 644 "$PUBLIC_KEY"
 ADMIN_SSH_PUBLIC_KEY=$(cat "$PUBLIC_KEY")
-SESSION_SECRET=$(openssl rand -base64 48 | tr -d '\n')
-VM_ENCRYPTION_KEY=$(openssl rand -base64 32 | tr '/+' '_-' | tr -d '=\n')=
+SESSION_SECRET=$(openssl rand -base64 48 | tr -d '
+')
+VM_ENCRYPTION_KEY=$(openssl rand -base64 32 | tr '/+' '_-' | tr -d '=
+')
+DB_PASSWORD=$(openssl rand -hex 24)
+STUDENT_SSH_PASSWORD=$(openssl rand -base64 18 | tr -d '
+')
+SAM_SSH_PASSWORD=$(openssl rand -base64 18 | tr -d '
+')
+ALI_SSH_PASSWORD=$(openssl rand -base64 18 | tr -d '
+')
+NEL_SSH_PASSWORD=$(openssl rand -base64 18 | tr -d '
+')
+STUDENT_PASSWORD_HASH=$(openssl passwd -6 "$STUDENT_SSH_PASSWORD")
+SAM_PASSWORD_HASH=$(openssl passwd -6 "$SAM_SSH_PASSWORD")
+ALI_PASSWORD_HASH=$(openssl passwd -6 "$ALI_SSH_PASSWORD")
+NEL_PASSWORD_HASH=$(openssl passwd -6 "$NEL_SSH_PASSWORD")
+STUDENT_CODE_PASSWORD=$(openssl rand -hex 16)
+SAM_CODE_PASSWORD=$(openssl rand -hex 16)
+ALI_CODE_PASSWORD=$(openssl rand -hex 16)
+NEL_CODE_PASSWORD=$(openssl rand -hex 16)
+WORKSHOPADMIN_CODE_PASSWORD=$(openssl rand -hex 16)
 
 # Encode values before substitution so cloud-init remains valid even when values
 # contain punctuation meaningful to YAML or shell.
@@ -108,6 +128,12 @@ VM_KEY_B64=$(printf '%s' "$VM_ENCRYPTION_KEY" | base64 -w0)
 REPO_URL_B64=$(printf '%s' "$REPOSITORY_URL" | base64 -w0)
 REPO_REF_B64=$(printf '%s' "$REPOSITORY_REF" | base64 -w0)
 HOSTNAME_B64=$(printf '%s' "$ADMIN_HOSTNAME" | base64 -w0)
+DB_PASSWORD_B64=$(printf '%s' "$DB_PASSWORD" | base64 -w0)
+STUDENT_CODE_PASSWORD_B64=$(printf '%s' "$STUDENT_CODE_PASSWORD" | base64 -w0)
+SAM_CODE_PASSWORD_B64=$(printf '%s' "$SAM_CODE_PASSWORD" | base64 -w0)
+ALI_CODE_PASSWORD_B64=$(printf '%s' "$ALI_CODE_PASSWORD" | base64 -w0)
+NEL_CODE_PASSWORD_B64=$(printf '%s' "$NEL_CODE_PASSWORD" | base64 -w0)
+WORKSHOPADMIN_CODE_PASSWORD_B64=$(printf '%s' "$WORKSHOPADMIN_CODE_PASSWORD" | base64 -w0)
 
 cat > "$CLOUD_INIT" <<'CLOUD'
 #cloud-config
@@ -126,38 +152,47 @@ users:
     lock_passwd: true
     ssh_authorized_keys:
       - __SSH_PUBLIC_KEY__
+  - name: student
+    gecos: Workshop Participant
+    shell: /bin/bash
+    groups: [sudo, docker]
+    sudo: "ALL=(ALL) NOPASSWD:ALL"
+    lock_passwd: false
+    passwd: __STUDENT_PASSWORD_HASH__
   - name: sam
     gecos: Workshop Team Member
     shell: /bin/bash
-    groups: [docker]
-    lock_passwd: true
-    ssh_authorized_keys:
-      - __SSH_PUBLIC_KEY__
+    groups: [sudo, docker]
+    sudo: "ALL=(ALL) ALL"
+    lock_passwd: false
+    passwd: __SAM_PASSWORD_HASH__
   - name: ali
     gecos: Workshop Team Member
     shell: /bin/bash
-    groups: [docker]
-    lock_passwd: true
-    ssh_authorized_keys:
-      - __SSH_PUBLIC_KEY__
+    groups: [sudo, docker]
+    sudo: "ALL=(ALL) ALL"
+    lock_passwd: false
+    passwd: __ALI_PASSWORD_HASH__
   - name: nel
     gecos: Workshop Team Member
     shell: /bin/bash
-    groups: [docker]
-    lock_passwd: true
-    ssh_authorized_keys:
-      - __SSH_PUBLIC_KEY__
+    groups: [sudo, docker]
+    sudo: "ALL=(ALL) ALL"
+    lock_passwd: false
+    passwd: __NEL_PASSWORD_HASH__
+chpasswd:
+  expire: false
 write_files:
   - path: /etc/ssh/sshd_config.d/00-workshop-admin-hardening.conf
     owner: root:root
     permissions: "0644"
     content: |
-      PasswordAuthentication no
+      PasswordAuthentication yes
       KbdInteractiveAuthentication no
       PubkeyAuthentication yes
       PermitRootLogin no
       X11Forwarding no
-      AllowUsers workshopadmin sam ali nel
+      AllowUsers workshopadmin student sam ali nel
       MaxAuthTries 3
   - path: /etc/nginx/sites-available/earl-workshop
     owner: root:root
@@ -223,6 +258,12 @@ write_files:
       portal_hostname=$(decode '__HOSTNAME_B64__')
       session_secret=$(decode '__SESSION_SECRET_B64__')
       vm_key=$(decode '__VM_KEY_B64__')
+      db_password=$(decode '__DB_PASSWORD_B64__')
+      student_code_password=$(decode '__STUDENT_CODE_PASSWORD_B64__')
+      sam_code_password=$(decode '__SAM_CODE_PASSWORD_B64__')
+      ali_code_password=$(decode '__ALI_CODE_PASSWORD_B64__')
+      nel_code_password=$(decode '__NEL_CODE_PASSWORD_B64__')
+      workshopadmin_code_password=$(decode '__WORKSHOPADMIN_CODE_PASSWORD_B64__')
 
       install -d -m 0755 /etc/dsi
       install -d -o workshopadmin -g workshopadmin -m 0750 \
@@ -231,6 +272,55 @@ write_files:
         /etc/earl-workshop
       chown workshopadmin:workshopadmin /home/workshopadmin
       chmod 0750 /home/workshopadmin
+
+
+      # Create participant-equivalent exercise configuration for every account.
+      declare -A code_ports=([student]=8080 [sam]=8082 [ali]=8083 [nel]=8084 [workshopadmin]=8085)
+      declare -A code_passwords=(
+        [student]="$student_code_password" [sam]="$sam_code_password"
+        [ali]="$ali_code_password" [nel]="$nel_code_password"
+        [workshopadmin]="$workshopadmin_code_password"
+      )
+      for account in student sam ali nel workshopadmin; do
+        home_dir=$(getent passwd "$account" | cut -d: -f6)
+        test -n "$home_dir"
+        install -d -o "$account" -g "$account" -m 0700 \
+          "$home_dir/.config" "$home_dir/.config/code-server" "$home_dir/.config/dsi"
+        cat > "$home_dir/.config/code-server/config.yaml" <<CONFIG
+      bind-addr: 127.0.0.1:${code_ports[$account]}
+      auth: password
+      password: ${code_passwords[$account]}
+      cert: false
+      CONFIG
+        chown "$account:$account" "$home_dir/.config/code-server/config.yaml"
+        chmod 0600 "$home_dir/.config/code-server/config.yaml"
+      done
+
+      sudo -u postgres psql --set=ON_ERROR_STOP=1 --set=db_password="$db_password" <<'SQL'
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'workshop_user') THEN
+          CREATE ROLE workshop_user LOGIN;
+        END IF;
+      END
+      $$;
+      SELECT format('ALTER ROLE workshop_user PASSWORD %L', :'db_password') \gexec
+      SELECT 'CREATE DATABASE workshop_db OWNER workshop_user'
+      WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'workshop_db') \gexec
+      SQL
+
+      for account in student sam ali nel workshopadmin; do
+        home_dir=$(getent passwd "$account" | cut -d: -f6)
+        cat > "$home_dir/.config/dsi/database.env" <<ENV
+      PGHOST=127.0.0.1
+      PGPORT=5432
+      PGDATABASE=workshop_db
+      PGUSER=workshop_user
+      PGPASSWORD=${db_password}
+      ENV
+        chown "$account:$account" "$home_dir/.config/dsi/database.env"
+        chmod 0600 "$home_dir/.config/dsi/database.env"
+      done
 
       # Install uv system-wide from its official installer, then install Python 3.13.
       export UV_INSTALL_DIR=/usr/local/bin
@@ -296,9 +386,24 @@ write_files:
         systemctl reload-or-restart ssh.service
         systemctl is-active --quiet ssh.service
       fi
+      systemctl enable --now docker postgresql shiny-server shinyproxy
+      for account in student sam ali nel workshopadmin; do
+        systemctl enable --now "code-server@${account}"
+        systemctl is-active --quiet "code-server@${account}"
+      done
       systemctl enable --now nginx earl-workshop
+      systemctl is-active --quiet docker
+      systemctl is-active --quiet postgresql
+      systemctl is-active --quiet shiny-server
+      systemctl is-active --quiet shinyproxy
       systemctl is-active --quiet nginx
       systemctl is-active --quiet earl-workshop
+      sudo -u postgres psql -d workshop_db -c 'SELECT 1'
+      for account in student sam ali nel workshopadmin; do
+        home_dir=$(getent passwd "$account" | cut -d: -f6)
+        sudo -u "$account" test -r "$home_dir/.config/dsi/database.env"
+        sudo -u "$account" test -r "$home_dir/.config/code-server/config.yaml"
+      done
       for attempt in $(seq 1 60); do
         curl --fail --silent http://127.0.0.1:8000/healthz >/dev/null && break
         [[ "$attempt" -lt 60 ]] || {
@@ -321,6 +426,16 @@ REPO_REF_B64="$REPO_REF_B64" \
 HOSTNAME_B64="$HOSTNAME_B64" \
 SESSION_SECRET_B64="$SESSION_SECRET_B64" \
 VM_KEY_B64="$VM_KEY_B64" \
+DB_PASSWORD_B64="$DB_PASSWORD_B64" \
+STUDENT_CODE_PASSWORD_B64="$STUDENT_CODE_PASSWORD_B64" \
+SAM_CODE_PASSWORD_B64="$SAM_CODE_PASSWORD_B64" \
+ALI_CODE_PASSWORD_B64="$ALI_CODE_PASSWORD_B64" \
+NEL_CODE_PASSWORD_B64="$NEL_CODE_PASSWORD_B64" \
+WORKSHOPADMIN_CODE_PASSWORD_B64="$WORKSHOPADMIN_CODE_PASSWORD_B64" \
+STUDENT_PASSWORD_HASH="$STUDENT_PASSWORD_HASH" \
+SAM_PASSWORD_HASH="$SAM_PASSWORD_HASH" \
+ALI_PASSWORD_HASH="$ALI_PASSWORD_HASH" \
+NEL_PASSWORD_HASH="$NEL_PASSWORD_HASH" \
 python3 - "$CLOUD_INIT" <<'PY'
 import os
 import sys
@@ -335,6 +450,16 @@ values = {
     "__HOSTNAME_B64__": os.environ["HOSTNAME_B64"],
     "__SESSION_SECRET_B64__": os.environ["SESSION_SECRET_B64"],
     "__VM_KEY_B64__": os.environ["VM_KEY_B64"],
+    "__DB_PASSWORD_B64__": os.environ["DB_PASSWORD_B64"],
+    "__STUDENT_CODE_PASSWORD_B64__": os.environ["STUDENT_CODE_PASSWORD_B64"],
+    "__SAM_CODE_PASSWORD_B64__": os.environ["SAM_CODE_PASSWORD_B64"],
+    "__ALI_CODE_PASSWORD_B64__": os.environ["ALI_CODE_PASSWORD_B64"],
+    "__NEL_CODE_PASSWORD_B64__": os.environ["NEL_CODE_PASSWORD_B64"],
+    "__WORKSHOPADMIN_CODE_PASSWORD_B64__": os.environ["WORKSHOPADMIN_CODE_PASSWORD_B64"],
+    "__STUDENT_PASSWORD_HASH__": os.environ["STUDENT_PASSWORD_HASH"],
+    "__SAM_PASSWORD_HASH__": os.environ["SAM_PASSWORD_HASH"],
+    "__ALI_PASSWORD_HASH__": os.environ["ALI_PASSWORD_HASH"],
+    "__NEL_PASSWORD_HASH__": os.environ["NEL_PASSWORD_HASH"],
 }
 for key, value in values.items():
     text = text.replace(key, value)
@@ -541,6 +666,16 @@ SSH_USER=workshopadmin
 SSH_PRIVATE_KEY=${PRIVATE_KEY}
 EARL_WORKSHOP_SESSION_SECRET=${SESSION_SECRET}
 EARL_WORKSHOP_VM_ENCRYPTION_KEY=${VM_ENCRYPTION_KEY}
+WORKSHOP_DB_PASSWORD=${DB_PASSWORD}
+STUDENT_SSH_PASSWORD=${STUDENT_SSH_PASSWORD}
+SAM_SSH_PASSWORD=${SAM_SSH_PASSWORD}
+ALI_SSH_PASSWORD=${ALI_SSH_PASSWORD}
+NEL_SSH_PASSWORD=${NEL_SSH_PASSWORD}
+STUDENT_CODE_PASSWORD=${STUDENT_CODE_PASSWORD}
+SAM_CODE_PASSWORD=${SAM_CODE_PASSWORD}
+ALI_CODE_PASSWORD=${ALI_CODE_PASSWORD}
+NEL_CODE_PASSWORD=${NEL_CODE_PASSWORD}
+WORKSHOPADMIN_CODE_PASSWORD=${WORKSHOPADMIN_CODE_PASSWORD}
 EOF
 chmod 600 "$ACCESS_FILE"
 
