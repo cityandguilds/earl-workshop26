@@ -649,7 +649,7 @@ First site admin user created as follows:
 
 ```bash
 ssh -t -i "${PRIVATE_KEY}" \
-  "workshopadmin@${ADMIN_HOSTNAME}" \
+  "workshop@${ADMIN_HOSTNAME}" \
   "sudo -u workshopadmin bash -lc '
     set -a
     source /etc/earl-workshop/earl-workshop.env

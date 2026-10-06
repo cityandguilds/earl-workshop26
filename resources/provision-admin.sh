@@ -97,23 +97,21 @@ fi
 chmod 600 "$PRIVATE_KEY"
 chmod 644 "$PUBLIC_KEY"
 ADMIN_SSH_PUBLIC_KEY=$(cat "$PUBLIC_KEY")
-SESSION_SECRET=$(openssl rand -base64 48 | tr -d '
-')
-VM_ENCRYPTION_KEY=$(openssl rand -base64 32 | tr '/+' '_-' | tr -d '=
-')
+SESSION_SECRET=$(openssl rand -base64 48 | tr -d '')
+VM_ENCRYPTION_KEY=$(python3 - <<'PY'
+from cryptography.fernet import Fernet
+print(Fernet.generate_key().decode())
+PY
+)
 DB_PASSWORD=$(openssl rand -hex 24)
-STUDENT_SSH_PASSWORD=$(openssl rand -base64 18 | tr -d '
-')
-SAM_SSH_PASSWORD=$(openssl rand -base64 18 | tr -d '
-')
-ALI_SSH_PASSWORD=$(openssl rand -base64 18 | tr -d '
-')
-NEL_SSH_PASSWORD=$(openssl rand -base64 18 | tr -d '
-')
-STUDENT_PASSWORD_HASH=$(openssl passwd -6 "$STUDENT_SSH_PASSWORD")
-SAM_PASSWORD_HASH=$(openssl passwd -6 "$SAM_SSH_PASSWORD")
-ALI_PASSWORD_HASH=$(openssl passwd -6 "$ALI_SSH_PASSWORD")
-NEL_PASSWORD_HASH=$(openssl passwd -6 "$NEL_SSH_PASSWORD")
+STUDENT_SSH_PASSWORD=$(openssl rand -base64 18 | tr -d '')
+SAM_SSH_PASSWORD=$(openssl rand -base64 18 | tr -d '')
+ALI_SSH_PASSWORD=$(openssl rand -base64 18 | tr -d '')
+NEL_SSH_PASSWORD=$(openssl rand -base64 18 | tr -d '')
+STUDENT_PASSWORD_HASH=$(python3 -c "import crypt; print(crypt.crypt('$STUDENT_SSH_PASSWORD', crypt.mksalt(crypt.METHOD_SHA512)))")
+SAM_PASSWORD_HASH=$(python3 -c "import crypt; print(crypt.crypt('$SAM_SSH_PASSWORD', crypt.mksalt(crypt.METHOD_SHA512)))")
+ALI_PASSWORD_HASH=$(python3 -c "import crypt; print(crypt.crypt('$ALI_SSH_PASSWORD', crypt.mksalt(crypt.METHOD_SHA512)))")
+NEL_PASSWORD_HASH=$(python3 -c "import crypt; print(crypt.crypt('$NEL_SSH_PASSWORD', crypt.mksalt(crypt.METHOD_SHA512)))")
 STUDENT_CODE_PASSWORD=$(openssl rand -hex 16)
 SAM_CODE_PASSWORD=$(openssl rand -hex 16)
 ALI_CODE_PASSWORD=$(openssl rand -hex 16)
