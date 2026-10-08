@@ -1,13 +1,13 @@
-# EARL Workshop: DigitalOcean -> FastAPI Webserver
+# EARL Workshop: DigitalOcean -> FastAPI portal
 
-The complete deployment run as follows:
+Complete deployment run:
 
   - Generate or select the secure SSH key.
-  - Create the Droplet.
+  - Create the Droplet (VM).
   - Apply the DigitalOcean Cloud Firewall.
   - Run cloud-init to install and start FastAPI behind Nginx.
-  - Create or update the workshop A record.
-  - Wait for the hostname to resolve to the Droplet.
+  - **DNS**: Create or update the workshop A record.
+  - Wait for hostname to resolve.
   - Verify the HTTP health endpoint.
   - Run Certbot’s Nginx plugin.
   - Test certificate renewal.
@@ -30,27 +30,27 @@ doctl compute ssh-key list --format ID,Name
 
 ## Files
 
-- `deploy-webserver.sh`: run locally. Creates the Droplet, firewall, DNS record, and HTTPS certificate.
-- `provision-webserver.sh`: embedded into Droplet user data by the deployment script.
-- `webserver.env.example`: copy to `webserver.env` and configure.
+- `deploy-portal.sh`: run locally. Creates the Droplet, firewall, DNS record, and HTTPS certificate.
+- `provision-portal.sh`: embedded into Droplet user data by the deployment script.
+- `portal.env.example`: copy to `portal.env` and configure.
 
 ## Preparation
 
 ```bash
-cp webserver.env.example webserver.env
-chmod 600 webserver.env
+cp portal.env.example portal.env
+chmod 600 portal.env
 openssl passwd -6 # on linux
 ```
 
-Paste the resulting password hash into `WORKSHOP_PASSWORD_HASH` in `deployment.env`. Configure `SSH_KEY_NAME` and `CERTBOT_EMAIL` too.
+Paste the resulting password hash into `WORKSHOP_PASSWORD_HASH` in `portal.env`. Configure `SSH_KEY_NAME` and `CERTBOT_EMAIL` too.
 
 The local machine needs `doctl`, `ssh`, `ssh-keygen`, `openssl`, `curl`, `dig`, `python3`, and the Python `cryptography` package. Authenticate the configured doctl context before deployment.
 
 ## Deploy
 
 ```bash
-chmod +x deploy-webserver.sh provision-webserver.sh
-./deploy-webserver.sh ./webserver.env
+chmod +x deploy-portal.sh provision-portal.sh
+./deploy-portal.sh ./portal.env
 ```
 
 ## Post-deployment

@@ -1,2 +1,2 @@
-workshop.env
+config/*.env
 install-keys.sh

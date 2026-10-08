@@ -31,7 +31,7 @@ dashboard. VM passwords are encrypted at rest with a dedicated Fernet key.
 assets/                  supplied brand guidance and image assets
 content/workshop.yml    workshop title and subtitle
 content/pages/          Markdown course pages
-resources/              non-secret teaching resources
+resources/              non-secret teaching resources, fast API demo app
 src/earl_workshop/      FastAPI app, loader, templates, and CSS
 tests/                  content, persistence, authentication, and admin workflow tests
 ```

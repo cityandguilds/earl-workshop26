@@ -73,7 +73,7 @@ trap 'rm -f "$CLOUD_INIT"' EXIT
   printf 'export SERVER_NAME=%q\n' "$SERVER_NAME"
   printf 'export REPOSITORY_URL=%q\n' "$REPOSITORY_URL"
   printf 'export REPOSITORY_REF=%q\n' "$REPOSITORY_REF"
-  cat "${SCRIPT_DIR}/provision-webserver.sh"
+  cat "${SCRIPT_DIR}/provision-portal.sh"
 } > "$CLOUD_INIT"
 chmod 600 "$CLOUD_INIT"
 

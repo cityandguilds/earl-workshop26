@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# set default permissions
+# locked down by default
 umask 077
 
 # work inside workshop context
@@ -62,14 +62,13 @@ wait_for_dns() {
 }
 
 # variables
-cd resources/
+cd infrastructure/
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-CONFIG_FILE="${1:-${SCRIPT_DIR}/workshop.env}"
+CONFIG_FILE="${1:-${SCRIPT_DIR}/config/workshop.env}"
 [[ -r "$CONFIG_FILE" ]] || {
   echo "ERROR: Cannot read $CONFIG_FILE" >&2
   exit 1
 }
-# shellcheck source=/dev/null
 source "$CONFIG_FILE"
 
 : "${SSH_KEY_NAME:?Missing SSH_KEY_NAME}"
@@ -81,7 +80,7 @@ source "$CONFIG_FILE"
 : "${CREATE_DIGITALOCEAN_DNS:=true}"
 : "${CERTBOT_STAGING:=false}" #! true for testing
 
-TEMPLATE="${SCRIPT_DIR}/cloud-init.template.yml"
+TEMPLATE="${SCRIPT_DIR}/participants/cloud-init.template.yml"
 CONFIG_DIR="${SCRIPT_DIR}/../participant-config"
 ACCESS_FILE="${CONFIG_DIR}/access-details.csv"
 

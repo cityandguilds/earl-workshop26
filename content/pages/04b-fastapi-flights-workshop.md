@@ -215,7 +215,7 @@ Clone the workshop repository into a temporary directory:
 
 ```bash
 REPOSITORY_URL="https://github.com/cityandguilds/earl-workshop26.git"
-APP_SOURCE_DIR="resources/dsi-fastapi"
+APP_SOURCE_DIR="resources/applications/dsi-fastapi"
 
 rm -rf /tmp/earl-workshop26
 

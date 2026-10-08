@@ -10,10 +10,10 @@ if ! [[ -t 0 && -t 1 ]]; then
 fi
 
 # load/generate env vars
-cd resources
+cd infrastructure/
 # chmod 600 workshop.env
 
-CONFIG_FILE="${1:-./workshop.env}"
+CONFIG_FILE="${1:-./config/workshop.env}"
 
 if [[ ! -r "$CONFIG_FILE" ]]; then
   printf 'Configuration file is not readable: %s\n' "$CONFIG_FILE" >&2

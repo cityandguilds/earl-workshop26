@@ -21,11 +21,11 @@ A useful first review is to compare:
 - the participant-facing lesson pages;
 - the instructor notes;
 - the application source code;
-- the `resources/` folder with the scripts and templates used to create the workshop infrastructure.
+- the `infrastructure/` folder with the scripts and templates used to create the workshop infrastructure.
 
-## Explore the `resources/` folder
+## Explore the `infrastructure/` folder
 
-The `resources/` folder shows how the workshop environment was assembled rather than only how it was used.
+The `infrastructure/` folder shows how the workshop environment was assembled.
 
 Focus on these responsibilities:
 
@@ -279,8 +279,8 @@ Involve your technology, security, data governance, and service-management teams
 Choose a manageable sequence:
 
 - [ ] Star or fork the workshop repository.
-- [ ] Read the `resources/` folder from start to finish.
-- [ ] Draw the provisioning sequence in your own words.
+- [ ] Explore the `infrastructure` directory.
+- [ ] Draw a provisioning flow diagram.
 - [ ] Create one disposable Linux VM.
 - [ ] Apply restrictive firewall rules.
 - [ ] Publish a static page through Nginx.
