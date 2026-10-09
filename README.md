@@ -1,10 +1,10 @@
-# EARL 2026 Workshop Portal
+# Data Science Infrastructure Workshop
 
-This repository contains the runnable v0.2.0 foundation for the City & Guilds EARL 2026 workshop, “Development to Deployment: Infrastructure for Data Teams”. It is a small FastAPI application with server-rendered HTML, local CSS, and filesystem-driven course-page skeletons.
+This repository contains code for a workshop portal and all materials for 'infrastructure as code' provisioning of DigitalOcean cloud infrastructure for the portal and participant virtual machines.
 
-The course skeleton covers Ubuntu VM context, a Bash primer, application and system dependencies, containers, PostgreSQL, deployment options, and serving Shiny, Quarto, and FastAPI applications. Its Markdown is intentionally limited to authoring prompts, so authors can substantially revise it without changing Python route code.
+The bulk of the repo is the runnable foundation for a Data Science Infrastructure workshop portal, “Data Science Infrastructure: Open source software". It is a small FastAPI application with server-rendered HTML, local CSS, and filesystem-driven course-page skeletons. The course skeleton covers Ubuntu VM context, a Bash primer, application and system dependencies, containers, PostgreSQL, deployment options, and serving Shiny, Quarto, and FastAPI applications. Infrastructure provisioning is limited to the `infrastructure/` sub-directory.
 
-## Run locally
+## Run portal locally
 
 The project requires Python 3.13 and [uv](https://docs.astral.sh/uv/).
 
@@ -21,22 +21,21 @@ The installed console entry point is also available:
 uv run earl-workshop serve
 ```
 
-The portal includes application-managed user persistence, portal authentication, an authenticated
-Markdown course experience, a protected administrator area, and an attendee VM-credentials
-dashboard. VM passwords are encrypted at rest with a dedicated Fernet key.
+The portal includes application-managed user persistence, portal authentication, an authenticated Markdown course experience, a protected administrator area, and an attendee VM-credentials dashboard. VM passwords are encrypted at rest with a dedicated Fernet key.
 
 ## Repository layout
 
 ```text
-assets/                  supplied brand guidance and image assets
+assets/                 supplied brand guidance and image assets
 content/workshop.yml    workshop title and subtitle
 content/pages/          Markdown course pages
+infrastructure/         'infrastructure as code' scripts for initiating cloud infrastructure and firewall, provisioning a workshop portal to run the website and provisioning participant machines from a golden image snapshot
 resources/              non-secret teaching resources, fast API demo app
 src/earl_workshop/      FastAPI app, loader, templates, and CSS
 tests/                  content, persistence, authentication, and admin workflow tests
 ```
 
-The public Learn more page uses these local thumbnail files:
+The public 'Learn more' page uses these local thumbnail files:
 
 - `src/earl_workshop/static/images/peoplecert-placeholder.png`
 - `src/earl_workshop/static/images/city-guilds-placeholder.png`
@@ -50,8 +49,8 @@ The supplied files under `assets/` are the branding authority. `assets/brand.md`
 The course is loaded from `content/` at application startup. `workshop.yml` contains only site-level metadata:
 
 ```yaml
-title: Development to Deployment
-subtitle: Infrastructure for Data Teams
+title: Data Science Infrastructure
+subtitle: Open source software
 ```
 
 Each `content/pages/*.md` file begins with a YAML front matter block followed by Markdown:
