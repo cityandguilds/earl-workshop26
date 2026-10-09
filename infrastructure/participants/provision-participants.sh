@@ -81,7 +81,7 @@ source "$CONFIG_FILE"
 : "${CERTBOT_STAGING:=false}" #! true for testing
 
 TEMPLATE="${SCRIPT_DIR}/participants/cloud-init.template.yml"
-CONFIG_DIR="${SCRIPT_DIR}/../participant-config"
+CONFIG_DIR="${SCRIPT_DIR}/../.participant-config"
 ACCESS_FILE="${CONFIG_DIR}/access-details.csv"
 
 PYTHON="${SCRIPT_DIR}/.venv/bin/python"

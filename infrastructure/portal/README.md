@@ -1,4 +1,4 @@
-# EARL Workshop: DigitalOcean -> FastAPI portal
+# Provision a DigitalOcean -> FastAPI workshop portal
 
 Complete deployment run:
 
@@ -71,4 +71,4 @@ sudo earl-workshop-init health
 sudo earl-workshop-init test-renewal
 ```
 
-The private SSH key and `access-details.env` are created beside the deployment script. Keep both private and do not commit them.
+The private SSH key is created beside the deployment script. Keep public and private keys private and do not commit them.

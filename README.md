@@ -2,7 +2,7 @@
 
 This repository contains code for a workshop portal and all materials for 'infrastructure as code' provisioning of DigitalOcean cloud infrastructure for the portal and participant virtual machines.
 
-The bulk of the repo is the runnable foundation for a Data Science Infrastructure workshop portal, “Data Science Infrastructure: Open source software". It is a small FastAPI application with server-rendered HTML, local CSS, and filesystem-driven course-page skeletons. The course skeleton covers Ubuntu VM context, a Bash primer, application and system dependencies, containers, PostgreSQL, deployment options, and serving Shiny, Quarto, and FastAPI applications. Infrastructure provisioning is limited to the `infrastructure/` sub-directory.
+The bulk of the repo is the runnable foundation for a Data Science Infrastructure workshop portal, “Data Science Infrastructure: Open source software". It is a small FastAPI application with server-rendered HTML, local CSS, and filesystem-driven course-page skeletons. The course skeleton covers Ubuntu VM context, a Bash primer, application and system dependencies, containers, PostgreSQL, deployment options, and serving Shiny, Quarto, and FastAPI applications. Infrastructure provisioning is limited to the `infrastructure/` sub-directory with dedicated READMEs for the portal and participant deployments.
 
 ## Run portal locally
 

@@ -26,12 +26,4 @@ data/
 .codex/
 todos.*
 
-participant-config/
-admin-config/
-participant-config/
-participant-config/
-participant-config/
-participant-config/
-participant-config/
-participant-config/
-participant-config/
+.participant-config/

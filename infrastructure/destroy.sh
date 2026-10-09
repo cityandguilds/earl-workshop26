@@ -21,7 +21,7 @@ if [ -n "${DROPLET_IDS// }" ]; then
   doctl compute droplet delete $DROPLET_IDS --force
 fi
 
-shred -u participant-config/cloud-init-*.yml 2>/dev/null || true
-shred -u participant-config/access-details.csv 2>/dev/null || true
-shred -u participant-config/dsi-*-ssh 2>/dev/null || true
-rm -f participant-config/dsi-*-ssh.pub
+shred -u .participant-config/cloud-init-*.yml 2>/dev/null || true
+shred -u .participant-config/access-details.csv 2>/dev/null || true
+shred -u .participant-config/dsi-*-ssh 2>/dev/null || true
+rm -f .participant-config/dsi-*-ssh.pub
