@@ -4,7 +4,7 @@ title: "Publish flights data with FastAPI"
 slug: "fastapi-flights"
 order: 310
 section: "FastAPI"
-section_order: 310
+section_order: 300
 summary: "Create, start, document, and query a FastAPI backed by PostgreSQL"
 level: "Beginner"
 estimated_minutes: 30

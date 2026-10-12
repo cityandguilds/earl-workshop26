@@ -4,7 +4,7 @@ title: "Deploy shinyFlights with Shiny Server"
 slug: "shiny-server-deployment"
 order: 210
 section: "Shiny"
-section_order: 210
+section_order: 200
 summary: "Deploy a Shiny application to Shiny Server and connect it to PostgreSQL"
 level: "Beginner"
 estimated_minutes: 30

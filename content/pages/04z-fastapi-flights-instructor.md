@@ -4,7 +4,7 @@ title: "Instructor notes: Flights API"
 slug: "fastapi-flights-instructor"
 order: 910
 section: "Instructor resources"
-section_order: 910
+section_order: 900
 summary: "Preparation and recovery notes for the FastAPI workshop session"
 level: "Instructor"
 estimated_minutes: 30

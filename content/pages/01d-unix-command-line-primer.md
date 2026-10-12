@@ -4,7 +4,7 @@ title: "Unix command-line primer"
 slug: "unix-command-line-primer"
 order: 40
 section: "Getting started"
-section_order: 40
+section_order: 10
 summary: "Navigate files, copy work securely, and inspect a workshop VM from the terminal."
 level: "Beginner"
 estimated_minutes: 15

@@ -4,7 +4,7 @@ title: "PostgreSQL open-data exercise solutions"
 slug: "postgresql-open-data-solutions"
 order: 110
 section: "PostgreSQL"
-section_order: 110
+section_order: 100
 summary: "Suggested solutions using the flights schema"
 level: "Beginner"
 estimated_minutes: 10
