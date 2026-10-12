@@ -21,7 +21,17 @@ if [ -n "${DROPLET_IDS// }" ]; then
   doctl compute droplet delete $DROPLET_IDS --force
 fi
 
-shred -u .participant-config/cloud-init-*.yml 2>/dev/null || true
-shred -u .participant-config/access-details.csv 2>/dev/null || true
-shred -u .participant-config/dsi-*-ssh 2>/dev/null || true
-rm -f .participant-config/dsi-*-ssh.pub
+shred -u ../.participant-config/cloud-init-*.yml 2>/dev/null || true
+shred -u ../.participant-config/access-details.csv 2>/dev/null || true
+shred -u ../.participant-config/dsi-*-ssh 2>/dev/null || true
+rm -f ../.participant-config/dsi-*-ssh.pub
+
+# DNS records
+doctl compute domain records list "$DOMAIN" \
+  --format ID,Type,Name,Data \
+  --no-header | \
+awk '$2=="A" && $3 ~ /^dsi-/' | \
+while read id type name ip; do
+  echo "Deleting $name ($ip) [ID=$id]"
+  doctl compute domain records delete "$DOMAIN" "$id" --force
+done
