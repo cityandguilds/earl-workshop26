@@ -76,9 +76,9 @@ source "$CONFIG_FILE"
 : "${SNAPSHOT_NAME:?Missing SNAPSHOT_NAME}"
 : "${PROJECT_NAME:?Missing PROJECT_NAME}"
 
-: "${PARTICIPANT_COUNT:=14}"
+: "${PARTICIPANT_COUNT:=1}"
 : "${CREATE_DIGITALOCEAN_DNS:=true}"
-: "${CERTBOT_STAGING:=false}" #! true for testing
+: "${CERTBOT_STAGING:=true}" #! false for prod
 
 TEMPLATE="${SCRIPT_DIR}/participants/cloud-init.template.yml"
 CONFIG_DIR="${SCRIPT_DIR}/../.participant-config"
